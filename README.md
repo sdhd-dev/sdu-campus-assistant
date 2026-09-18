@@ -2,19 +2,20 @@
 
 A university team project for campus navigation, room and faculty search, campus
 services, and student schedules. **US-01 provides the project and database
-foundation; US-02 adds email registration.** Login/logout, profile selection, and
-campus features are not implemented. Registration does not sign users in.
+foundation; US-02 adds email registration; US-03 adds session-based email login
+and logout.** Profile selection and campus features are not implemented.
+Registration does not sign users in automatically.
 
 ## Structure
 
 ```text
 backend/                 Django + Django REST Framework
-  accounts/              Email-based User model, registration API, and tests
+  accounts/              Email-based User model, registration/session APIs, and tests
   config/settings/       Shared, development, and production settings
   core/                  Public database-aware health endpoint
   requirements.txt       Pinned Python dependencies, including transitive packages
 frontend/                React + Vite, JavaScript
-  src/                   Registration page with live backend status
+  src/                   Registration, login, account state, and live backend status
   package-lock.json      Reproducible frontend dependency tree
 docs/                    Architecture and security decisions
 .env.example             Development environment template
@@ -134,6 +135,9 @@ npm --prefix frontend run dev
 Open **http://127.0.0.1:5173** to create an account. See the
 [US-02 API and manual verification guide](docs/registration.md) for registration
 behavior, pgAdmin checks, changed files, and validation results.
+Use **Sign in** to log in with an existing account. The page restores your session
+after refresh and displays your email and **Sign out**. See the
+[US-03 login/logout guide](docs/authentication.md) for API details and manual checks.
 
 The **Service status** link leads to the health panel in the footer. It requests
 `/api/health/` through Vite's
@@ -176,7 +180,7 @@ GET request supplies a CSRF token and password instructions.
 
 ## Production settings
 
-Deployment is outside US-01 and US-02. See [architecture and security](docs/architecture.md).
+Deployment is outside US-01 through US-03. See [architecture and security](docs/architecture.md).
 Production must explicitly set `DJANGO_SETTINGS_MODULE=config.settings.production`
 and supply `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` (comma-separated, no wildcard),
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`,

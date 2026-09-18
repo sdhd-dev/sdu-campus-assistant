@@ -11,6 +11,18 @@ User = get_user_model()
 DUPLICATE_EMAIL = "An account with this email already exists."
 
 
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+    password = serializers.CharField(write_only=True, trim_whitespace=False, max_length=128)
+
+    @sensitive_variables()
+    def to_internal_value(self, data):
+        if (not isinstance(data, Mapping) or set(data) != {"email", "password"}
+                or any(not isinstance(value, str) for value in data.values())):
+            raise serializers.ValidationError("Invalid email or password.")
+        return super().to_internal_value(data)
+
+
 class RegistrationSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
     password = serializers.CharField(write_only=True, trim_whitespace=False, max_length=128)

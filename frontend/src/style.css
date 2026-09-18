@@ -39,6 +39,10 @@ h2 { margin: 0; font-size: 1.75rem; font-weight: 650; letter-spacing: -0.035em; 
 .card-description { color: var(--muted); font-size: 0.86rem; margin: 10px 0 22px; }
 .required-note { color: var(--muted); font-size: 0.75rem; margin: 0 0 16px; }
 .form-field label { display: block; font-size: 0.85rem; font-weight: 650; margin-bottom: 7px; }
+.login-password { margin-top: 18px; margin-bottom: 16px; }
+.login-password .visibility-toggle { font-size: 0.7rem; }
+.account-email { overflow-wrap: anywhere; }
+#authentication { min-width: 0; }
 .input-wrap { position: relative; }
 input { width: 100%; height: 48px; padding: 10px 14px; border: 1px solid #7f968b; border-radius: 9px; background: #fff; color: #172b26; }
 input:not([type='email']) { padding-right: 52px; }

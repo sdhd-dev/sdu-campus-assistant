@@ -1,5 +1,8 @@
 # US-02: email registration
 
+This guide records US-02. Login/logout and the current sign-in navigation are now
+available in [US-03](authentication.md); registration still does not sign users in.
+
 US-02 adds account creation to the US-01 foundation. It does not implement login,
 logout, automatic login, email verification, or profile selection. New users retain
 `profile_type=VISITOR`, `is_staff=false`, and `is_superuser=false`.

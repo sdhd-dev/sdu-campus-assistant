@@ -1,7 +1,7 @@
 # Architecture and security decisions
 
 The browser runs a React interface built by Vite. During development it requests
-relative URLs `/api/health/` and `/api/auth/register/`; Vite forwards `/api` to
+relative URLs `/api/health/` and `/api/auth/…`; Vite forwards `/api` to
 Django REST Framework.
 Django queries PostgreSQL through its ORM/driver. Keeping database credentials
 in the backend means they never enter browser JavaScript. No `VITE_*` secret is
@@ -50,9 +50,17 @@ privilege flags and must not use affiliation as proof of authorization. Affiliat
 verification and access policy belong to later user stories.
 
 US-02 exposes registration at `/api/auth/register/`. It accepts only email,
-password, and password confirmation. Login/logout, profile, and admin HTTP routes
-remain outside the current scope. Registration creates a user without logging in
+password, and password confirmation. Profile and admin HTTP routes remain outside
+the current scope. Registration creates a user without logging in
 or issuing an authentication token. See [the registration guide](registration.md).
+
+US-03 adds Django's built-in `authenticate`, `login`, and `logout` with database
+sessions. Login and logout require CSRF even for anonymous requests. Login rotates
+the session key and CSRF secret; logout flushes the server session. The current-user
+endpoint requires an active authenticated account and returns only email and a
+masked CSRF token. Session cookies are HttpOnly and SameSite=Lax by Django default,
+and Secure in production. No authentication tokens or passwords are stored in
+localStorage. See [the authentication guide](authentication.md).
 
 ## Configuration boundaries
 
@@ -73,8 +81,8 @@ proxy, deployment configuration must set `SECURE_PROXY_SSL_HEADER` only after
 ensuring that the trusted proxy strips client-supplied forwarding headers and
 that clients cannot bypass it. Otherwise HTTPS detection can be spoofed. CSRF,
 session, clickjacking, and security middleware remain enabled. Future DRF views
-default to requiring authentication; health and registration explicitly allow
-anonymous access. Registration extends DRF session authentication to enforce
+default to requiring authentication; health, registration, and login explicitly
+allow anonymous access. Registration and session endpoints extend DRF session authentication to enforce
 CSRF even for anonymous POST requests. A GET supplies a masked CSRF token and
 sets the CSRF cookie without creating a login session. Development trusts only
 the two explicit Vite origins (`http://127.0.0.1:5173` and

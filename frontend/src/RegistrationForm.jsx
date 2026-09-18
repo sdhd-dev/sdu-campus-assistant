@@ -153,7 +153,7 @@ export default function RegistrationForm() {
           <span className="success-icon" aria-hidden="true">✓</span>
           <h3 tabIndex="-1" ref={(node) => { controls.current.success = node; }}>Your account is ready</h3>
           <p>Registered as <strong>{createdEmail}</strong>.</p>
-          <p>You haven’t been signed in. Sign-in will be available in a future update.</p>
+          <p>You haven’t been signed in. <a href="#login">Sign in to your account</a>.</p>
         </div>
       ) : (
         <form onSubmit={submit} noValidate aria-busy={pending}>
@@ -201,6 +201,7 @@ export default function RegistrationForm() {
           <p className="form-note">Creating an account won’t sign you in automatically.</p>
         </form>
       )}
+      {!createdEmail && <p className="form-note">Already have an account? <a href="#login">Sign in</a></p>}
       <p className="sr-only" role="status">{createdEmail ? 'Account created successfully. You are not signed in.' : pending ? 'Creating account…' : ''}</p>
     </section>
   );
