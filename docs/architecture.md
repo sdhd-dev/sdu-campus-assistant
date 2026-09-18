@@ -1,7 +1,8 @@
-# US-01 architecture and security decisions
+# Architecture and security decisions
 
 The browser runs a React interface built by Vite. During development it requests
-the relative URL `/api/health/`; Vite forwards `/api` to Django REST Framework.
+relative URLs `/api/health/` and `/api/auth/register/`; Vite forwards `/api` to
+Django REST Framework.
 Django queries PostgreSQL through its ORM/driver. Keeping database credentials
 in the backend means they never enter browser JavaScript. No `VITE_*` secret is
 needed. A same-origin production router should preserve the same `/api` contract,
@@ -37,8 +38,9 @@ significantly harder.
 Passwords use Django's `set_password`/`check_password`, which store salted hashes;
 no custom encryption or plaintext password storage is introduced. A missing
 password creates an unusable password. Django's standard password validators are
-configured, but a future registration/reset implementation must explicitly call
-password validation; model-manager methods do not enforce password policy.
+configured and explicitly called by the registration serializer with the proposed
+user, including email similarity checks. Model-manager methods alone do not
+enforce password policy. Future password-reset flows must also validate passwords.
 
 `profile_type` describes a campus affiliation: `STUDENT`, `STAFF`, or `VISITOR`.
 It defaults to `VISITOR`, and a database constraint rejects other values.
@@ -47,8 +49,10 @@ their independent Django meanings. Future public serializers must exclude those
 privilege flags and must not use affiliation as proof of authorization. Affiliation
 verification and access policy belong to later user stories.
 
-There are no registration, login/logout, profile, or admin HTTP routes. The model
-supports Django's existing authentication machinery as a foundation only.
+US-02 exposes registration at `/api/auth/register/`. It accepts only email,
+password, and password confirmation. Login/logout, profile, and admin HTTP routes
+remain outside the current scope. Registration creates a user without logging in
+or issuing an authentication token. See [the registration guide](registration.md).
 
 ## Configuration boundaries
 
@@ -69,8 +73,15 @@ proxy, deployment configuration must set `SECURE_PROXY_SSL_HEADER` only after
 ensuring that the trusted proxy strips client-supplied forwarding headers and
 that clients cannot bypass it. Otherwise HTTPS detection can be spoofed. CSRF,
 session, clickjacking, and security middleware remain enabled. Future DRF views
-default to requiring authentication; only the health endpoint explicitly allows
-anonymous access.
+default to requiring authentication; health and registration explicitly allow
+anonymous access. Registration extends DRF session authentication to enforce
+CSRF even for anonymous POST requests. A GET supplies a masked CSRF token and
+sets the CSRF cookie without creating a login session. Development trusts only
+the two explicit Vite origins (`http://127.0.0.1:5173` and
+`http://localhost:5173`) because the existing proxy rewrites Host while preserving
+the browser Origin. Production inherits neither exception and uses same-origin
+routing. CSRF middleware and the Vite proxy remain enabled; no CORS package or
+permissive origin rule is added.
 
 ## Database and health endpoint
 

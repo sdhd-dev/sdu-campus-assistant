@@ -1,20 +1,20 @@
 # SDU Campus Assistant
 
 A university team project for campus navigation, room and faculty search, campus
-services, and student schedules. **US-01 implements only the project and database
-foundation.** Registration, login/logout, profile APIs, and campus features are not
-implemented.
+services, and student schedules. **US-01 provides the project and database
+foundation; US-02 adds email registration.** Login/logout, profile selection, and
+campus features are not implemented. Registration does not sign users in.
 
 ## Structure
 
 ```text
 backend/                 Django + Django REST Framework
-  accounts/              Email-based User model and initial migration
+  accounts/              Email-based User model, registration API, and tests
   config/settings/       Shared, development, and production settings
   core/                  Public database-aware health endpoint
   requirements.txt       Pinned Python dependencies, including transitive packages
 frontend/                React + Vite, JavaScript
-  src/                   Starter page with live backend status
+  src/                   Registration page with live backend status
   package-lock.json      Reproducible frontend dependency tree
 docs/                    Architecture and security decisions
 .env.example             Development environment template
@@ -131,7 +131,12 @@ Terminal 2, from the repository root:
 npm --prefix frontend run dev
 ```
 
-Open **http://127.0.0.1:5173**. The page requests `/api/health/` through Vite's
+Open **http://127.0.0.1:5173** to create an account. See the
+[US-02 API and manual verification guide](docs/registration.md) for registration
+behavior, pgAdmin checks, changed files, and validation results.
+
+The **Service status** link leads to the health panel in the footer. It requests
+`/api/health/` through Vite's
 development proxy to Django at `127.0.0.1:8000`. It displays loading, healthy,
 and error states and provides a retry button. The healthy state requires a
 successful PostgreSQL query. Requests time out after eight seconds.
@@ -165,12 +170,13 @@ curl --fail http://127.0.0.1:5173/api/health/
 Both HTTP checks should return `{"status":"ok"}`. With Django stopped, retrying
 on the page must show an error. With PostgreSQL stopped and Django running, the
 endpoint returns HTTP 503 and `{"status":"unavailable"}`. Restart the stopped
-service and click **Check again** to recover. No endpoint returns credentials,
-database names, server versions, or exception details.
+service and click **Check again** to recover. The health endpoint returns no
+credentials, database names, server versions, or exception details. Registration returns only the normalized account email; its
+GET request supplies a CSRF token and password instructions.
 
 ## Production settings
 
-Deployment is outside US-01. See [architecture and security](docs/architecture.md).
+Deployment is outside US-01 and US-02. See [architecture and security](docs/architecture.md).
 Production must explicitly set `DJANGO_SETTINGS_MODULE=config.settings.production`
 and supply `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` (comma-separated, no wildcard),
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`,

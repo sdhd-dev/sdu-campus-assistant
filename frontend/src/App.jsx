@@ -1,64 +1,32 @@
-import { useEffect, useState } from 'react';
+import RegistrationForm from './RegistrationForm.jsx';
+import ServiceStatus from './ServiceStatus.jsx';
 
 export default function App() {
-  const [status, setStatus] = useState('loading');
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    setStatus('loading');
-
-    async function checkBackend() {
-      try {
-        const response = await fetch('/api/health/', {
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        if (!response.ok) throw new Error('Backend unavailable');
-        const data = await response.json();
-        if (data.status !== 'ok') throw new Error('Unexpected health response');
-        if (active) setStatus('ok');
-      } catch {
-        if (active) setStatus('error');
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    checkBackend();
-    return () => {
-      active = false;
-      clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [attempt]);
-
-  const statusText = {
-    loading: 'Checking backend connection…',
-    ok: 'Backend and database are online.',
-    error: 'Cannot reach a healthy backend. Check that Django and PostgreSQL are running, then try again.',
-  };
-
   return (
-    <main>
-      <p className="eyebrow">SDU · UNIVERSITY TEAM PROJECT</p>
-      <h1>SDU Campus Assistant</h1>
-      <p className="intro">
-        A foundation for finding your way around campus, discovering university
-        services, and keeping up with student schedules.
-      </p>
-      <section className="status-card" aria-labelledby="status-title">
-        <h2 id="status-title">Service status</h2>
-        <p role="status" aria-live="polite" className={`status ${status}`}>
-          {statusText[status]}
-        </p>
-        <button disabled={status === 'loading'} onClick={() => setAttempt((value) => value + 1)}>
-          {status === 'loading' ? 'Checking…' : 'Check again'}
-        </button>
-      </section>
-      <p className="footnote">US-01 · Project &amp; database setup</p>
-    </main>
+    <div className="page-shell">
+      <a className="skip-link" href="#registration">Skip to registration</a>
+      <header className="site-header">
+        <span className="brand-mark" aria-hidden="true">SDU</span>
+        <span className="brand-name">Campus Assistant<span>UNIVERSITY TEAM PROJECT</span></span>
+        <a className="status-link" href="#status-title">Service status <span aria-hidden="true">↗</span></a>
+      </header>
+      <main className="registration-layout">
+        <section className="introduction" aria-labelledby="project-title">
+          <p className="eyebrow">YOUR CAMPUS. A LITTLE CLOSER.</p>
+          <h1 id="project-title">Welcome to your<br className="desktop-break" /> campus community.</h1>
+          <p className="intro">SDU Campus Assistant is taking shape: a place to find your way,
+            discover university services, and keep up with student schedules.</p>
+          <p className="intro-note">Start by creating your account.</p>
+          <div className="project-note"><span className="note-line" aria-hidden="true" />
+            <p>Built for everyday campus life.<br /><span>Made by a university team.</span></p>
+          </div>
+        </section>
+        <RegistrationForm />
+      </main>
+      <footer className="site-footer">
+        <p>SDU Campus Assistant <span>· A university team project</span></p>
+        <ServiceStatus />
+      </footer>
+    </div>
   );
 }

@@ -9,6 +9,8 @@ load_dotenv(Path(__file__).resolve().parents[3] / ".env", override=False)
 from .base import *  # noqa: E402,F403
 
 DEBUG = True
+# Vite preserves the browser Origin while proxying the Host to Django.
+CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:5173", "http://localhost:5173"]
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
