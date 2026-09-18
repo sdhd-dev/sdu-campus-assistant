@@ -9,6 +9,8 @@ from rest_framework import serializers
 
 User = get_user_model()
 DUPLICATE_EMAIL = "An account with this email already exists."
+PROFILE_ONLY_FIELD = "Only profile_type is accepted."
+INVALID_PROFILE_TYPE = "Choose Student, Staff, or Visitor."
 
 
 class LoginSerializer(serializers.Serializer):
@@ -21,6 +23,32 @@ class LoginSerializer(serializers.Serializer):
                 or any(not isinstance(value, str) for value in data.values())):
             raise serializers.ValidationError("Invalid email or password.")
         return super().to_internal_value(data)
+
+
+class ProfileSerializer(serializers.Serializer):
+    """Accepts profile_type alone. Affiliation is descriptive and grants no permissions."""
+
+    profile_type = serializers.ChoiceField(
+        choices=User.ProfileType.choices,
+        # The default message quotes the submitted value back to the client.
+        error_messages={"invalid_choice": INVALID_PROFILE_TYPE},
+    )
+
+    def to_internal_value(self, data):
+        if not isinstance(data, Mapping):
+            raise serializers.ValidationError({"non_field_errors": [PROFILE_ONLY_FIELD]})
+        if set(data) != set(self.fields):
+            raise serializers.ValidationError({"non_field_errors": [PROFILE_ONLY_FIELD]})
+        # ChoiceField otherwise matches non-string values against the choice keys.
+        if not isinstance(data["profile_type"], str):
+            raise serializers.ValidationError({"profile_type": [INVALID_PROFILE_TYPE]})
+        return super().to_internal_value(data)
+
+    def update(self, instance, validated_data):
+        # update_fields keeps the UPDATE to this one column; no privilege field is written.
+        instance.profile_type = validated_data["profile_type"]
+        instance.save(update_fields=["profile_type"])
+        return instance
 
 
 class RegistrationSerializer(serializers.Serializer):

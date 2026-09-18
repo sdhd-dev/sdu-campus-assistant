@@ -50,8 +50,8 @@ privilege flags and must not use affiliation as proof of authorization. Affiliat
 verification and access policy belong to later user stories.
 
 US-02 exposes registration at `/api/auth/register/`. It accepts only email,
-password, and password confirmation. Profile and admin HTTP routes remain outside
-the current scope. Registration creates a user without logging in
+password, and password confirmation. Admin HTTP routes remain outside the current
+scope. Registration creates a user without logging in
 or issuing an authentication token. See [the registration guide](registration.md).
 
 US-03 adds Django's built-in `authenticate`, `login`, and `logout` with database
@@ -61,6 +61,13 @@ endpoint requires an active authenticated account and returns only email and a
 masked CSRF token. Session cookies are HttpOnly and SameSite=Lax by Django default,
 and Secure in production. No authentication tokens or passwords are stored in
 localStorage. See [the authentication guide](authentication.md).
+
+US-04 adds `/api/profile/`, the first authenticated write. It derives the account
+from the session, accepts `profile_type` and nothing else, rejects unsupported
+values, and saves with `update_fields` so no other column is written. Privilege
+flags, group membership, email, and password are not writable there, so setting
+the STAFF affiliation cannot escalate anything. CSRF applies to the PATCH as it
+does to login and logout. See [the profile guide](profile.md).
 
 ## Configuration boundaries
 

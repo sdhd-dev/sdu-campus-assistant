@@ -3,19 +3,20 @@
 A university team project for campus navigation, room and faculty search, campus
 services, and student schedules. **US-01 provides the project and database
 foundation; US-02 adds email registration; US-03 adds session-based email login
-and logout.** Profile selection and campus features are not implemented.
-Registration does not sign users in automatically.
+and logout; US-04 adds profile type selection.** Campus features are not
+implemented. Registration does not sign users in automatically. This is a first
+working version of Sprint 1, not a production-ready release.
 
 ## Structure
 
 ```text
 backend/                 Django + Django REST Framework
-  accounts/              Email-based User model, registration/session APIs, and tests
+  accounts/              Email-based User model, registration/session/profile APIs, and tests
   config/settings/       Shared, development, and production settings
   core/                  Public database-aware health endpoint
   requirements.txt       Pinned Python dependencies, including transitive packages
 frontend/                React + Vite, JavaScript
-  src/                   Registration, login, account state, and live backend status
+  src/                   Registration, login, profile selection, and live backend status
   package-lock.json      Reproducible frontend dependency tree
 docs/                    Architecture and security decisions
 .env.example             Development environment template
@@ -136,8 +137,16 @@ Open **http://127.0.0.1:5173** to create an account. See the
 [US-02 API and manual verification guide](docs/registration.md) for registration
 behavior, pgAdmin checks, changed files, and validation results.
 Use **Sign in** to log in with an existing account. The page restores your session
-after refresh and displays your email and **Sign out**. See the
+after refresh. See the
 [US-03 login/logout guide](docs/authentication.md) for API details and manual checks.
+
+Signing in opens your campus profile: it shows your email and lets you choose
+**Student**, **Staff**, or **Visitor**. The choice is saved to your account
+through a CSRF-protected `PATCH /api/profile/` and is restored after a refresh and
+at your next sign-in. Affiliation is descriptive only and never grants
+administrative access. See the
+[US-04 profile guide](docs/profile.md) for the API, rejection rules, verification
+results, and manual checks.
 
 The **Service status** link leads to the health panel in the footer. It requests
 `/api/health/` through Vite's
@@ -176,11 +185,16 @@ on the page must show an error. With PostgreSQL stopped and Django running, the
 endpoint returns HTTP 503 and `{"status":"unavailable"}`. Restart the stopped
 service and click **Check again** to recover. The health endpoint returns no
 credentials, database names, server versions, or exception details. Registration returns only the normalized account email; its
-GET request supplies a CSRF token and password instructions.
+GET request supplies a CSRF token and password instructions. The profile endpoint
+returns only the email, the saved affiliation, and the available options.
+
+All 48 backend tests pass (`accounts` and `core`). Quick manual pass:
+register → sign in → choose an affiliation → **Save profile** → refresh →
+**Sign out** → sign in again and confirm the selection survived.
 
 ## Production settings
 
-Deployment is outside US-01 through US-03. See [architecture and security](docs/architecture.md).
+Deployment is outside US-01 through US-04. See [architecture and security](docs/architecture.md).
 Production must explicitly set `DJANGO_SETTINGS_MODULE=config.settings.production`
 and supply `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS` (comma-separated, no wildcard),
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`,

@@ -43,7 +43,9 @@ export default function ServiceStatus() {
 
   return (
     <section className="status-card" aria-labelledby="status-title">
-      <h2 id="status-title">Service status</h2>
+      <h2 id="status-title">
+        <span className={`status-dot ${status}`} aria-hidden="true" />Service status
+      </h2>
       <p role="status" aria-live="polite" className={`status ${status}`}>
         {statusText[status]}
       </p>

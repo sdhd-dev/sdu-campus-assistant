@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import EyeIcon from './EyeIcon.jsx';
 
 const endpoint = '/api/auth/register/';
 const emptyValues = { email: '', password: '', password_confirmation: '' };
@@ -17,16 +18,6 @@ function validate(name, values) {
   } else if (value.length > 128) return 'Use 128 characters or fewer.';
   if (name === 'password_confirmation' && value !== values.password) return 'Passwords do not match.';
   return '';
-}
-
-function EyeIcon({ visible }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-      <circle cx="12" cy="12" r="3" />
-      {visible && <path d="m3 3 18 18" />}
-    </svg>
-  );
 }
 
 export default function RegistrationForm() {
@@ -144,22 +135,26 @@ export default function RegistrationForm() {
   }
 
   return (
-    <section className="registration-card" id="registration" aria-labelledby="registration-title">
-      <p className="eyebrow">GET STARTED</p>
+    <section className="panel" id="registration" aria-labelledby="registration-title">
+      <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Get started</p>
       <h2 id="registration-title">Create your account</h2>
       <p className="card-description">A first step toward a more connected campus.</p>
       {createdEmail ? (
         <div className="success-panel">
-          <span className="success-icon" aria-hidden="true">✓</span>
+          <span className="success-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+              strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.6 4.6L19 7" /></svg>
+          </span>
           <h3 tabIndex="-1" ref={(node) => { controls.current.success = node; }}>Your account is ready</h3>
           <p>Registered as <strong>{createdEmail}</strong>.</p>
-          <p>You haven’t been signed in. <a href="#login">Sign in to your account</a>.</p>
+          <p>You haven’t been signed in yet.</p>
+          <a className="link-button" href="#login">Sign in to your account</a>
         </div>
       ) : (
         <form onSubmit={submit} noValidate aria-busy={pending}>
           <p className="required-note">All fields are required.</p>
-          {fields.map(({ name, label, autoComplete }) => (
-            <div className="form-field" key={name}>
+          {fields.map(({ name, label, autoComplete }, index) => (
+            <div className="form-field" key={name} style={{ '--stagger': `${index * 55}ms` }}>
               <label htmlFor={name}>{label}</label>
               <div className="input-wrap">
                 <input

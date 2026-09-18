@@ -1,97 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import LoginForm from './LoginForm.jsx';
+import ProfilePanel from './ProfilePanel.jsx';
 import RegistrationForm from './RegistrationForm.jsx';
 import { authRequest, isSession } from './auth.js';
 
-function SignedIn({ session, onSignedOut }) {
-  const [token, setToken] = useState(session.csrf_token);
-  const [email, setEmail] = useState(session.email);
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('');
-  const busy = useRef(false);
-  const controller = useRef(null);
-  const heading = useRef(null);
-
-  useEffect(() => {
-    heading.current?.focus();
-    const lifecycle = new AbortController();
-    controller.current = lifecycle;
-    let checking = false;
-    async function checkSession() {
-      if (busy.current || checking || document.visibilityState === 'hidden') return;
-      checking = true;
-      try {
-        const { response, data } = await authRequest('me', { signal: lifecycle.signal });
-        if (lifecycle.signal.aborted || busy.current) return;
-        if (response.status === 401) {
-          onSignedOut('Your session has expired. Please sign in again.');
-        } else {
-          if (!response.ok || !isSession(data)) throw new Error('Session unavailable');
-          setToken(data.csrf_token);
-          setEmail(data.email);
-          setMessage('');
-        }
-      } catch {
-        if (!lifecycle.signal.aborted && !busy.current) setMessage('We couldn’t check your session. Check your connection and try again.');
-      } finally { checking = false; }
-    }
-    const timer = setInterval(checkSession, 60000);
-    window.addEventListener('focus', checkSession);
-    document.addEventListener('visibilitychange', checkSession);
-    return () => {
-      lifecycle.abort();
-      clearInterval(timer);
-      window.removeEventListener('focus', checkSession);
-      document.removeEventListener('visibilitychange', checkSession);
-    };
-  }, [onSignedOut]);
-
-  async function logout() {
-    if (busy.current) return;
-    busy.current = true;
-    setPending(true);
-    setMessage('');
-    try {
-      const { response } = await authRequest('logout', {
-        method: 'POST', signal: controller.current.signal, headers: { 'X-CSRFToken': token },
-      });
-      if (response.status === 403) {
-        // Another tab may have rotated the CSRF cookie. Refresh before retrying.
-        const { response: current, data } = await authRequest('me', { signal: controller.current.signal });
-        if (current.status === 401) {
-          onSignedOut('Your session has expired. Please sign in again.');
-          return;
-        }
-        if (!current.ok || !isSession(data)) throw new Error('Session unavailable');
-        setToken(data.csrf_token);
-        setEmail(data.email);
-        setMessage('Your security check changed. Please try signing out again.');
-        return;
-      }
-      if (response.status !== 204) throw new Error('Sign-out failed');
-      onSignedOut('You have signed out.');
-    } catch {
-      if (!controller.current.signal.aborted) setMessage('We couldn’t confirm sign-out. Check your connection and try again.');
-    } finally {
-      busy.current = false;
-      setPending(false);
-    }
-  }
-
-  return (
-    <section className="registration-card" id="account" aria-labelledby="account-title">
-      <p className="eyebrow">YOUR ACCOUNT</p>
-      <h2 id="account-title" tabIndex="-1" ref={heading}>You’re signed in</h2>
-      <p className="account-email">{email}</p>
-      <p className="form-message" role="alert">{message}</p>
-      {message && <button className="secondary-button" disabled={pending}
-        onClick={() => window.location.reload()}>Check session again</button>}
-      <button className="submit-button" onClick={logout} disabled={pending}>
-        {pending ? 'Signing out…' : 'Sign out'}
-      </button>
-    </section>
-  );
-}
+const INTRO = {
+  register: {
+    eyebrow: 'Your campus, a little closer',
+    title: <>Welcome to your<br className="desktop-break" /> campus community.</>,
+    lead: 'SDU Campus Assistant is taking shape: one place to find your way around '
+      + 'campus, look up university services, and keep track of your schedule.',
+    note: 'Create an account to reserve your place. It takes about a minute.',
+  },
+  login: {
+    eyebrow: 'Welcome back',
+    title: <>Good to see you<br className="desktop-break" /> on campus again.</>,
+    lead: 'Sign in with the email you registered. Your session is restored on this device '
+      + 'until you sign out.',
+    note: 'Signing in brings back your saved campus profile.',
+  },
+  profile: {
+    eyebrow: 'You’re signed in',
+    title: <>Let’s set up<br className="desktop-break" /> your campus profile.</>,
+    lead: 'Your affiliation tells the assistant which parts of campus life are most '
+      + 'relevant to you, from lecture halls to visitor entrances.',
+    note: 'Your choice is saved to your account and restored every time you sign in.',
+  },
+};
 
 export default function AuthPanel() {
   const [state, setState] = useState({ status: 'loading' });
@@ -129,18 +64,53 @@ export default function AuthPanel() {
     return () => controller.abort();
   }, [attempt]);
 
+  let view = 'register';
   let content;
-  if (state.status === 'authenticated') content = <SignedIn session={state.session} onSignedOut={signedOut} />;
-  else if (state.status === 'anonymous') content = page === 'login'
-    ? <LoginForm notice={notice} onLogin={(session) => { setNotice(''); setState({ status: 'authenticated', session }); }} />
-    : <RegistrationForm />;
-  else content = (
-    <section className="registration-card" aria-label="Account status">
-      {state.status === 'loading' ? <p role="status">Checking your session…</p> : <>
-        <p role="alert">We couldn’t check your session. Check your connection and try again.</p>
-        <button className="secondary-button" onClick={() => setAttempt((value) => value + 1)}>Try again</button>
-      </>}
-    </section>
+  if (state.status === 'authenticated') {
+    view = 'profile';
+    content = <ProfilePanel session={state.session} onSignedOut={signedOut} />;
+  } else if (state.status === 'anonymous') {
+    view = page;
+    content = page === 'login'
+      ? <LoginForm notice={notice} onLogin={(session) => {
+        setNotice('');
+        setState({ status: 'authenticated', session });
+      }} />
+      : <RegistrationForm />;
+  } else {
+    view = state.status;
+    content = (
+      <section className="panel panel-waiting" aria-label="Account status">
+        {state.status === 'loading' ? (
+          <p className="waiting-line" role="status">
+            <span className="waiting-dot" aria-hidden="true" />Checking your session…
+          </p>
+        ) : (
+          <>
+            <p role="alert">We couldn’t check your session. Check your connection and try again.</p>
+            <button className="secondary-button" onClick={() => setAttempt((value) => value + 1)}>
+              Try again
+            </button>
+          </>
+        )}
+      </section>
+    );
+  }
+
+  const intro = INTRO[view] || INTRO.register;
+  return (
+    <div className="auth-layout">
+      <section className="introduction" key={intro.eyebrow} aria-labelledby="project-title">
+        <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />{intro.eyebrow}</p>
+        <h1 id="project-title">{intro.title}</h1>
+        <p className="intro">{intro.lead}</p>
+        <p className="intro-note">{intro.note}</p>
+        <div className="project-note">
+          <span className="note-line" aria-hidden="true" />
+          <p>Built for everyday campus life.<br /><span>Made by a university team.</span></p>
+        </div>
+      </section>
+      <div id="authentication" tabIndex="-1" key={view}>{content}</div>
+    </div>
   );
-  return <div id="authentication">{content}</div>;
 }

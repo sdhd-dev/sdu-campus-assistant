@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import EyeIcon from './EyeIcon.jsx';
 import { authRequest, isSession } from './auth.js';
 
 export default function LoginForm({ onLogin, notice }) {
@@ -64,20 +65,22 @@ export default function LoginForm({ onLogin, notice }) {
   }
 
   return (
-    <section className="registration-card" id="login" aria-labelledby="login-title">
-      <p className="eyebrow">WELCOME BACK</p>
+    <section className="panel" id="login" aria-labelledby="login-title">
+      <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Welcome back</p>
       <h2 id="login-title">Sign in</h2>
       <p className="card-description">Use your email to return to your campus account.</p>
-      {notice && <p role="status">{notice}</p>}
+      {notice && <p className="notice" role="status">{notice}</p>}
       <form onSubmit={submit} aria-busy={pending}>
         <p className="required-note">All fields are required.</p>
-        <div className="form-field">
+        <div className="form-field" style={{ '--stagger': '0ms' }}>
           <label htmlFor="login-email">Email</label>
-          <input id="login-email" name="email" type="email" autoComplete="username" required
-            maxLength={254} autoCapitalize="none" spellCheck={false} value={email} readOnly={pending}
-            onChange={(event) => { setEmail(event.target.value); setMessage(''); }} />
+          <div className="input-wrap">
+            <input id="login-email" name="email" type="email" autoComplete="username" required
+              maxLength={254} autoCapitalize="none" spellCheck={false} value={email} readOnly={pending}
+              onChange={(event) => { setEmail(event.target.value); setMessage(''); }} />
+          </div>
         </div>
-        <div className="form-field login-password">
+        <div className="form-field login-password" style={{ '--stagger': '55ms' }}>
           <label htmlFor="login-password">Password</label>
           <div className="input-wrap">
             <input id="login-password" name="password" type={visible ? 'text' : 'password'}
@@ -85,7 +88,7 @@ export default function LoginForm({ onLogin, notice }) {
               onChange={(event) => { setPassword(event.target.value); setMessage(''); }} />
             <button className="visibility-toggle" type="button" aria-label={visible ? 'Hide password' : 'Show password'}
               aria-controls="login-password" aria-pressed={visible} onClick={() => setVisible(!visible)}>
-              <span aria-hidden="true">{visible ? 'Hide' : 'Show'}</span>
+              <EyeIcon visible={visible} />
             </button>
           </div>
         </div>
@@ -95,6 +98,9 @@ export default function LoginForm({ onLogin, notice }) {
         </div>}
         <div className="form-message" role="alert" tabIndex="-1" ref={messageRef}>{message}</div>
         <button className="submit-button" disabled={pending || !token} type="submit">
+          <span className={`button-indicator${pending || !token ? ' loading-indicator' : ''}`} aria-hidden="true">
+            {pending || !token ? '' : '↗'}
+          </span>
           {pending ? 'Signing in…' : token ? 'Sign in' : 'Preparing sign-in…'}
         </button>
       </form>

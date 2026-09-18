@@ -1,4 +1,6 @@
-from django.contrib.auth import authenticate, login as session_login, logout as session_logout
+from django.contrib.auth import (
+    authenticate, get_user_model, login as session_login, logout as session_logout,
+)
 from django.contrib.auth.password_validation import password_validators_help_texts
 from django.db import DatabaseError
 from django.middleware.csrf import get_token
@@ -9,7 +11,10 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .serializers import LoginSerializer, RegistrationSerializer
+from .serializers import LoginSerializer, ProfileSerializer, RegistrationSerializer
+
+User = get_user_model()
+UNAUTHENTICATED = {"detail": "Authentication required."}
 
 
 class CSRFAuthentication(SessionAuthentication):
@@ -85,5 +90,35 @@ def logout(request):
 @permission_classes([AllowAny])
 def current_user(request):
     if not request.user.is_authenticated:
-        return Response({"detail": "Authentication required."}, status=401)
+        return Response(UNAUTHENTICATED, status=401)
     return Response({"email": request.user.email, "csrf_token": get_token(request)})
+
+
+@never_cache
+@api_view(["GET", "PATCH"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+def profile(request):
+    # The account is taken from the session; the request body cannot name another user.
+    if not request.user.is_authenticated:
+        return Response(UNAUTHENTICATED, status=401)
+    user = request.user
+    if request.method == "PATCH":
+        serializer = ProfileSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        try:
+            user = serializer.update(user, serializer.validated_data)
+        except DatabaseError:
+            return Response(
+                {"detail": "Saving your profile is temporarily unavailable. Please try again."},
+                status=503,
+            )
+    return Response({
+        "email": user.email,
+        "profile_type": user.profile_type,
+        "profile_types": [
+            {"value": value, "label": label} for value, label in User.ProfileType.choices
+        ],
+        "csrf_token": get_token(request),
+    })
