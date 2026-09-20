@@ -17,8 +17,11 @@ backend/                 Django + Django REST Framework
   requirements.txt       Pinned Python dependencies, including transitive packages
 frontend/                React + Vite, JavaScript
   src/                   Registration, login, profile selection, and live backend status
+  src/campus/            The persistent campus photograph and its per-view framing
+  public/brand/          Official SDU University logo and favicon
+  public/campus/         Optimised campus photograph (WebP, with a JPEG fallback)
   package-lock.json      Reproducible frontend dependency tree
-docs/                    Architecture and security decisions
+docs/                    Architecture, security, and visual asset decisions
 .env.example             Development environment template
 .venv/                   Local Python environment (ignored)
 .local/                  Local database and optional Python installation (ignored)
@@ -147,6 +150,14 @@ at your next sign-in. Affiliation is descriptive only and never grants
 administrative access. See the
 [US-04 profile guide](docs/profile.md) for the API, rejection rules, verification
 results, and manual checks.
+
+Behind the account screens is a single photograph of the SDU main entrance,
+loaded once and never reloaded. Login, registration, and the profile are three
+crops of that one picture, and the crop moves smoothly between them. These are
+photographic moves — a push and a pan across a still image — not 3D camera
+rotations. `prefers-reduced-motion` holds one composed framing instead. Asset
+sources, licensing, and motion details are in the
+[campus experience guide](docs/campus-experience.md).
 
 The **Service status** link leads to the health panel in the footer. It requests
 `/api/health/` through Vite's

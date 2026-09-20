@@ -191,10 +191,8 @@ export default function ProfilePanel({ session, onSignedOut }) {
   return (
     <section className="panel profile-panel" id="profile" aria-labelledby="profile-title">
       <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Your account</p>
-      <h2 id="profile-title" tabIndex="-1" ref={heading}>Your campus profile</h2>
-      <p className="card-description">
-        Tell us how you’re connected to the university. You can change this at any time.
-      </p>
+      <h1 id="profile-title" tabIndex="-1" ref={heading}>Your campus profile</h1>
+      <p className="card-description">Change your affiliation at any time.</p>
 
       <div className="account-row">
         <span className="account-label">Signed in as</span>
@@ -258,7 +256,6 @@ export default function ProfilePanel({ session, onSignedOut }) {
       )}
 
       <div className="panel-footer">
-        <p>Campus navigation and schedules arrive in a later sprint.</p>
         <button type="button" className="ghost-button" onClick={logout} disabled={pending}>
           Sign out
         </button>

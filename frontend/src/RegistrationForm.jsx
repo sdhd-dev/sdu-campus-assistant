@@ -22,6 +22,7 @@ function validate(name, values) {
 
 export default function RegistrationForm() {
   const [values, setValues] = useState(emptyValues);
+  const [showRules, setShowRules] = useState(false);
   const [errors, setErrors] = useState({});
   const [visible, setVisible] = useState({});
   const [configuration, setConfiguration] = useState(null);
@@ -137,8 +138,8 @@ export default function RegistrationForm() {
   return (
     <section className="panel" id="registration" aria-labelledby="registration-title">
       <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Get started</p>
-      <h2 id="registration-title">Create your account</h2>
-      <p className="card-description">A first step toward a more connected campus.</p>
+      <h1 id="registration-title">Create your account</h1>
+      <p className="card-description">Registering does not sign you in.</p>
       {createdEmail ? (
         <div className="success-panel">
           <span className="success-icon" aria-hidden="true">
@@ -147,7 +148,6 @@ export default function RegistrationForm() {
           </span>
           <h3 tabIndex="-1" ref={(node) => { controls.current.success = node; }}>Your account is ready</h3>
           <p>Registered as <strong>{createdEmail}</strong>.</p>
-          <p>You haven’t been signed in yet.</p>
           <a className="link-button" href="#login">Sign in to your account</a>
         </div>
       ) : (
@@ -165,7 +165,11 @@ export default function RegistrationForm() {
                   aria-invalid={Boolean(errors[name])}
                   aria-describedby={`${name}-error${name === 'password' ? ' password-requirements' : ''}`}
                   onChange={(event) => change(name, event.target.value)}
-                  onBlur={() => { if (!pending) setErrors((previous) => ({ ...previous, [name]: validate(name, values) })); }}
+                  onFocus={() => { if (name === 'password') setShowRules(true); }}
+                  onBlur={() => {
+                    if (name === 'password' && !values.password) setShowRules(false);
+                    if (!pending) setErrors((previous) => ({ ...previous, [name]: validate(name, values) }));
+                  }}
                 />
                 {name !== 'email' && (
                   <button className="visibility-toggle" type="button" aria-label={`${visible[name] ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
@@ -177,9 +181,24 @@ export default function RegistrationForm() {
               </div>
               <p className="field-error" id={`${name}-error`} aria-live="polite">{errors[name] || '\u00a0'}</p>
               {name === 'password' && (
-                <div className="password-requirements" id="password-requirements">
-                  {configuration ? <><ul>{configuration.password_requirements.map((text) => <li key={text}>{text}</li>)}</ul>
-                    <p>Use no more than 128 characters.</p></> : <p>Loading password requirements…</p>}
+                <div className="password-requirements" id="password-requirements"
+                  data-open={showRules || undefined}>
+                  <button type="button" className="requirements-toggle" aria-expanded={showRules}
+                    aria-controls="password-requirements-list"
+                    onClick={() => setShowRules((open) => !open)}>
+                    Password requirements
+                    <span className="requirements-caret" aria-hidden="true">⌄</span>
+                  </button>
+                  <div className="requirements-body" id="password-requirements-list">
+                    <div>
+                      {configuration ? (
+                        <>
+                          <ul>{configuration.password_requirements.map((text) => <li key={text}>{text}</li>)}</ul>
+                          <p>Use no more than 128 characters.</p>
+                        </>
+                      ) : <p>Loading password requirements…</p>}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -193,7 +212,6 @@ export default function RegistrationForm() {
             <span className={`button-indicator ${pending ? 'loading-indicator' : ''}`} aria-hidden="true">{pending ? '' : '↗'}</span>
             {pending ? 'Creating account…' : 'Create account'}
           </button>
-          <p className="form-note">Creating an account won’t sign you in automatically.</p>
         </form>
       )}
       {!createdEmail && <p className="form-note">Already have an account? <a href="#login">Sign in</a></p>}

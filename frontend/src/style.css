@@ -1,5 +1,9 @@
 /* ---------------------------------------------------------------------------
-   SDU Campus Assistant — forest green, warm off-white, muted mint.
+   SDU Campus Assistant — the interface layer over the campus photograph.
+   Colours are drawn from the official SDU logo (orange #f5a467) and from the
+   photograph itself: the teal of the main block's glazing, warm off-white paper.
+   Text sits either on an opaque panel or on its own small surface, so the
+   photograph never needs a page-wide dark wash to stay readable.
    System fonts only: a serif display face for headings, sans for the interface.
 --------------------------------------------------------------------------- */
 
@@ -7,30 +11,34 @@
   --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
 
-  --ink: #15251f;
-  --ink-soft: #4a5d55;
-  --forest: #12362d;
-  --forest-600: #1d4d3f;
-  --forest-400: #47796a;
-  --mint-50: #f1f7f2;
-  --mint-100: #e3efe6;
-  --mint-200: #cfe2d5;
-  --cream: #f7f4ec;
-  --surface: #fffdf8;
-  --line: #e0dbcd;
-  --line-strong: #8b9c92;
-  --amber: #8f5c1c;
-  --amber-bright: #d6a760;
-  --amber-soft: #f3e6cd;
-  --error: #9c2b28;
-  --error-soft: #fbeceb;
-  --ok: #1c6b48;
-  --focus: #1d6b52;
+  /* Official SDU orange, plus a darkened tint that passes contrast on cream. */
+  --sdu-orange: #f5a467;
+  --sdu-orange-ink: #9a4f11;
 
-  --radius-card: 22px;
+  --ink: #16242e;
+  --ink-soft: #4a5b67;
+  --teal: #0f425a;
+  --teal-600: #185f7e;
+  --teal-100: #e4eff3;
+  --teal-50: #f1f7f9;
+  --surface: #fdfaf5;
+  --surface-solid: #fffdf9;
+  --line: #e2dbcc;
+  --line-strong: #8d9aa1;
+  --amber-soft: #f6e8d2;
+  --error: #99231f;
+  --error-soft: #fbecea;
+  --ok: #156049;
+  --focus: #145877;
+
+  --radius-card: 20px;
   --radius-control: 11px;
-  --shadow-card: 0 1px 2px rgb(18 54 45 / 4%), 0 18px 44px -18px rgb(18 54 45 / 18%);
-  --shadow-lift: 0 2px 4px rgb(18 54 45 / 6%), 0 22px 50px -20px rgb(18 54 45 / 26%);
+  --shadow-card: 0 1px 2px rgb(8 28 42 / 8%), 0 4px 12px -4px rgb(8 28 42 / 14%),
+    0 26px 56px -24px rgb(8 28 42 / 42%);
+
+  /* One timing for every camera move, so navigation always feels the same. */
+  --camera-move: 1500ms;
+  --camera-ease: cubic-bezier(0.62, 0.02, 0.2, 1);
 
   font-family: var(--font-ui);
   color: var(--ink);
@@ -46,68 +54,20 @@ body {
   margin: 0;
   min-width: 280px;
   overflow-x: clip;
-  background:
-    radial-gradient(1100px 620px at 88% -8%, var(--mint-100) 0%, transparent 62%),
-    radial-gradient(760px 520px at -6% 8%, #f6efdf 0%, transparent 58%),
-    var(--cream);
-  background-attachment: fixed;
+  background: #7f8b8c;
 }
 
 button, input, fieldset, legend { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 button, a, input, label { -webkit-tap-highlight-color: transparent; }
-a { color: var(--forest-600); text-underline-offset: 4px; text-decoration-thickness: 1px; }
-a:hover { color: var(--forest); }
+a { color: var(--teal-600); text-underline-offset: 4px; text-decoration-thickness: 1px; }
+a:hover { color: var(--teal); }
 svg { display: block; }
 
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
 
 h1, h2, h3 { font-family: var(--font-display); font-weight: 600; }
-
-/* --- Campus backdrop ----------------------------------------------------- */
-
-.campus-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.backdrop-glow {
-  position: absolute;
-  inset: auto -10% -20% -10%;
-  height: 62%;
-  background: radial-gradient(60% 100% at 50% 100%, rgb(214 167 96 / 12%) 0%, transparent 70%);
-}
-
-.backdrop-skyline {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: min(46vh, 420px);
-  opacity: 0.8;
-}
-
-/* Fades the skyline into the page so footer text never sits on a busy area. */
-.campus-backdrop::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 170px;
-  background: linear-gradient(to bottom, rgb(247 244 236 / 0%), var(--cream) 82%);
-}
-
-.skyline-far { fill: #dfe9df; }
-.skyline-mid { fill: #d3e2d6; }
-.skyline-near { fill: #c4d9c9; }
-.skyline-windows { fill: var(--cream); }
-.tower-clock { fill: var(--cream); stroke: #c4d9c9; stroke-width: 3; }
-.skyline-lamp { fill: #b7d0bd; }
 
 /* --- Shell --------------------------------------------------------------- */
 
@@ -117,67 +77,65 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; }
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-height: 100svh;
-  max-width: 1240px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 48px;
+  padding: 0 clamp(16px, 4vw, 54px);
 }
 
+/* Header and footer text is light, and each element carries its own small
+   translucent surface rather than relying on a gradient over the photo. */
 .site-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  padding: 26px 0;
-  border-bottom: 1px solid var(--line);
+  gap: 10px 16px;
+  padding: 18px 0 16px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 4px;
-  margin: -4px;
-  border-radius: 14px;
-  color: inherit;
-  text-decoration: none;
-}
-
-.brand-mark {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 15px;
-  background: linear-gradient(155deg, var(--forest-600), var(--forest));
-  box-shadow: 0 6px 16px -8px rgb(18 54 45 / 60%);
+  gap: 12px;
+  padding: 8px 18px 8px 9px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 20px;
+  background: rgb(11 32 45 / 54%);
+  box-shadow: 0 8px 26px -14px rgb(6 20 30 / 80%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px) saturate(120%);
   color: #fff;
-  font-size: 0.92rem;
-  font-weight: 800;
-  letter-spacing: -0.035em;
+  text-decoration: none;
+  transition: background-color 180ms ease, border-color 180ms ease;
 }
 
-.brand-mark::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 9px;
-  width: 18px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--amber-bright);
-  transform: translateX(-50%);
+.brand:hover { border-color: rgb(255 255 255 / 34%); background: rgb(11 32 45 / 70%); }
+
+/* The official SDU University logo is a light-on-dark lockup, so the brand
+   carries its own dark surface rather than darkening the whole photograph. */
+.brand-plate { display: grid; place-items: center; flex: none; }
+
+.brand-logo {
+  width: 48px;
+  height: 48px;
 }
 
-.brand-name { font-weight: 700; font-size: 1rem; line-height: 1.4; }
+.brand-name {
+  font-weight: 650;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
 
 .brand-name span {
   display: block;
-  margin-top: 3px;
-  color: var(--ink-soft);
+  margin-top: 2px;
+  color: rgb(255 255 255 / 78%);
   font-size: 0.6rem;
   font-weight: 650;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .status-link {
@@ -185,12 +143,14 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; }
   align-items: center;
   gap: 7px;
   margin-left: auto;
-  padding: 11px 14px;
-  border: 1px solid var(--line);
+  padding: 10px 15px;
+  border: 1px solid rgb(255 255 255 / 30%);
   border-radius: 999px;
-  background: rgb(255 253 248 / 70%);
-  color: var(--ink-soft);
-  font-size: 0.78rem;
+  background: rgb(11 32 45 / 52%);
+  color: rgb(255 255 255 / 92%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  font-size: 0.76rem;
   font-weight: 650;
   text-decoration: none;
   white-space: nowrap;
@@ -198,9 +158,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; }
 }
 
 .status-link:hover {
-  border-color: var(--forest-400);
-  background: var(--surface);
-  color: var(--forest);
+  border-color: rgb(255 255 255 / 60%);
+  background: rgb(11 32 45 / 72%);
+  color: #fff;
 }
 
 .status-link-arrow { transition: transform 180ms ease; }
@@ -208,120 +168,123 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; }
 
 /* --- Main layout --------------------------------------------------------- */
 
-.auth-layout {
+main {
   display: grid;
-  grid-template-columns: 1.02fr 0.98fr;
-  gap: clamp(32px, 5.5vw, 76px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
   align-items: center;
-  padding: clamp(36px, 6vh, 76px) 0;
+  gap: clamp(24px, 4vw, 56px);
+  padding: clamp(12px, 3vh, 36px) 0 clamp(16px, 3vh, 32px);
 }
 
-.introduction, #authentication { min-width: 0; }
-.introduction { animation: rise 420ms cubic-bezier(0.22, 0.85, 0.3, 1) both; }
-#authentication { animation: rise 420ms cubic-bezier(0.22, 0.85, 0.3, 1) 90ms both; }
+#authentication { min-width: 0; max-width: 27rem; }
 #authentication:focus { outline: none; }
 
-.eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 20px;
-  color: var(--forest-600);
-  font-size: 0.7rem;
-  font-weight: 750;
-  letter-spacing: 0.15em;
+/* Names the current framing, so the three views read as one place seen three
+   ways rather than as three unrelated pictures. */
+.viewpoint {
+  align-self: end;
+  justify-self: end;
+  max-width: 21ch;
+  margin: 0;
+  color: #fff;
+  text-align: right;
+  text-shadow: 0 1px 3px rgb(6 22 34 / 72%), 0 2px 18px rgb(6 22 34 / 60%);
+  animation: caption-in 700ms ease-out both;
+}
+
+.viewpoint-place {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.28rem;
+  letter-spacing: -0.01em;
+}
+
+.viewpoint-detail {
+  display: block;
+  margin-top: 4px;
+  color: rgb(255 255 255 / 74%);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-}
-
-.eyebrow-rule {
-  width: 26px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--amber-bright), var(--forest-400));
-}
-
-h1 {
-  margin: 0 0 24px;
-  font-size: clamp(2.45rem, 4.2vw, 3.6rem);
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-}
-
-.intro { margin: 0; max-width: 430px; color: var(--ink-soft); font-size: 1.04rem; }
-
-.intro-note {
-  max-width: 430px;
-  margin: 20px 0 0;
-  font-weight: 620;
-  color: var(--ink);
-}
-
-.project-note {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: clamp(36px, 6vh, 64px);
-  font-size: 0.8rem;
-}
-
-.project-note p { margin: 0; }
-.project-note span:not(.note-line) { color: var(--ink-soft); }
-
-.note-line {
-  width: 3px;
-  height: 42px;
-  border-radius: 4px;
-  background: linear-gradient(180deg, var(--amber-bright), var(--forest-400));
 }
 
 /* --- Panel (form card) --------------------------------------------------- */
 
 .panel {
   position: relative;
-  padding: clamp(26px, 2.6vw, 34px);
-  border: 1px solid var(--line);
+  padding: clamp(20px, 2vw, 27px);
+  border: 1px solid rgb(255 255 255 / 70%);
   border-radius: var(--radius-card);
-  background: var(--surface);
+  background: rgb(253 251 247 / 96%);
   box-shadow: var(--shadow-card);
+  -webkit-backdrop-filter: blur(8px) saturate(110%);
+  backdrop-filter: blur(8px) saturate(110%);
   scroll-margin-top: 24px;
-  animation: panel-in 380ms cubic-bezier(0.22, 0.85, 0.3, 1) both;
+  animation: panel-in 620ms var(--camera-ease) 120ms both;
 }
 
-/* A hairline of campus green along the top edge of every card. */
+/* A hairline in the SDU orange along the top edge of every card. */
 .panel::before {
   content: '';
   position: absolute;
   top: -1px;
-  left: 28px;
-  right: 28px;
+  left: 26px;
+  right: 26px;
   height: 2px;
   border-radius: 0 0 3px 3px;
-  background: linear-gradient(90deg, transparent, var(--forest-400) 22%, var(--amber-bright) 78%, transparent);
-  opacity: 0.55;
+  background: linear-gradient(90deg, transparent, var(--teal-600) 20%, var(--sdu-orange) 80%, transparent);
 }
 
-.panel .eyebrow { margin-bottom: 10px; }
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 8px;
+  color: var(--sdu-orange-ink);
+  font-size: 0.66rem;
+  font-weight: 750;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.eyebrow-rule {
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sdu-orange), var(--teal-600));
+}
+
+h1:focus-visible { outline-offset: 7px; border-radius: 6px; }
+
+h1 {
+  margin: 0;
+  font-size: 1.58rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
 
 h2 {
   margin: 0;
-  font-size: clamp(1.6rem, 2.4vw, 1.85rem);
+  font-size: 1.5rem;
   line-height: 1.25;
   letter-spacing: -0.02em;
 }
 
-.card-description { margin: 10px 0 22px; color: var(--ink-soft); font-size: 0.89rem; }
+.card-description { margin: 6px 0 16px; color: var(--ink-soft); font-size: 0.86rem; }
 
 .notice {
-  margin: 0 0 18px;
-  padding: 11px 14px;
-  border: 1px solid var(--mint-200);
-  border-radius: var(--radius-control);
-  background: var(--mint-50);
-  color: var(--forest);
-  font-size: 0.82rem;
+  margin: 0 0 16px;
+  padding: 10px 13px;
+  border: 1px solid var(--teal-100);
+  border-left: 3px solid var(--teal-600);
+  border-radius: 8px;
+  background: var(--teal-50);
+  color: var(--teal);
+  font-size: 0.81rem;
 }
 
-.panel-waiting { display: grid; gap: 14px; justify-items: start; min-height: 190px; align-content: center; }
+.panel-waiting { display: grid; gap: 14px; justify-items: start; min-height: 168px; align-content: center; }
 .panel-waiting p { margin: 0; }
 
 .waiting-line {
@@ -330,7 +293,7 @@ h2 {
   gap: 11px;
   margin: 0;
   color: var(--ink-soft);
-  font-size: 0.88rem;
+  font-size: 0.87rem;
 }
 
 .waiting-dot {
@@ -338,60 +301,58 @@ h2 {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--forest-400);
+  background: var(--teal-600);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
 /* --- Forms --------------------------------------------------------------- */
 
-.required-note { margin: 0 0 16px; color: var(--ink-soft); font-size: 0.75rem; }
+.required-note { margin: 0 0 14px; color: var(--ink-soft); font-size: 0.73rem; }
 
-.form-field { animation: rise 340ms cubic-bezier(0.22, 0.85, 0.3, 1) var(--stagger, 0ms) both; }
+.form-field { animation: rise 420ms var(--camera-ease) calc(var(--stagger, 0ms) + 200ms) both; }
+.form-field + .form-field { margin-top: 14px; }
 
 .form-field label {
   display: block;
-  margin-bottom: 7px;
-  font-size: 0.83rem;
+  margin-bottom: 6px;
+  font-size: 0.81rem;
   font-weight: 650;
 }
-
-/* The sign-in form has no helper text between its two fields. */
-.login-password { margin-top: 18px; }
 
 .input-wrap { position: relative; }
 
 input {
   width: 100%;
-  height: 50px;
+  height: 46px;
   padding: 10px 14px;
   border: 1.5px solid var(--line-strong);
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-solid);
   color: var(--ink);
   transition: border-color 170ms ease, box-shadow 170ms ease, background-color 170ms ease;
 }
 
-.input-wrap:has(.visibility-toggle) input { padding-right: 54px; }
-input::placeholder { color: #8d9b94; }
-input:hover { border-color: var(--forest-400); }
+.input-wrap:has(.visibility-toggle) input { padding-right: 52px; }
+input::placeholder { color: #8b979d; }
+input:hover { border-color: var(--teal-600); }
 
 input:focus-visible {
   outline-offset: 1px;
-  border-color: var(--forest);
-  box-shadow: 0 0 0 4px rgb(29 107 82 / 12%);
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgb(20 88 119 / 14%);
 }
 
 input[aria-invalid='true'] { border-color: var(--error); background: var(--error-soft); }
-input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
+input[readonly] { background: var(--teal-50); color: var(--ink-soft); }
 
 .visibility-toggle {
   position: absolute;
-  top: 3px;
-  right: 3px;
+  top: 2px;
+  right: 2px;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   border: 0;
   border-radius: 9px;
@@ -400,56 +361,95 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   transition: background-color 170ms ease, color 170ms ease;
 }
 
-.visibility-toggle:hover { background: var(--mint-100); color: var(--forest); }
-.visibility-toggle[aria-pressed='true'] { color: var(--forest); }
+.visibility-toggle:hover { background: var(--teal-100); color: var(--teal); }
+.visibility-toggle[aria-pressed='true'] { color: var(--teal); }
 
+/* Messages stay in the document (and in the accessibility tree) but take no
+   room until they say something, which is what kept the cards so tall. */
 .field-error {
-  min-height: 1.5em;
-  margin: 5px 0 9px;
+  margin: 6px 0 0;
   color: var(--error);
   font-size: 0.75rem;
-  line-height: 1.5;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.password-requirements {
-  min-height: 130px;
-  margin: -2px 0 16px;
-  padding: 12px 14px;
-  border: 1px dashed var(--mint-200);
-  border-radius: 12px;
-  background: var(--mint-50);
-  color: var(--ink-soft);
-  font-size: 0.73rem;
-  line-height: 1.55;
-}
-
-.password-requirements ul { margin: 0; padding-left: 18px; }
-.password-requirements li { margin-bottom: 3px; }
-.password-requirements p { margin: 7px 0 0; }
+.field-error:empty,
+.form-message:empty { height: 0; margin: 0; overflow: hidden; }
 
 .form-message {
-  min-height: 24px;
-  margin-bottom: 8px;
+  margin: 14px 0 10px;
   color: var(--error);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.79rem;
+  line-height: 1.45;
 }
 
-.form-message:not(:empty) { animation: shake 320ms ease-out; }
+.form-message:not(:empty) { animation: nudge 300ms ease-out; }
 .form-message:focus-visible { outline-offset: 2px; }
 
 .setup-error {
-  margin-bottom: 14px;
-  padding: 13px 15px;
-  border: 1px solid #edcbc9;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #eccbc8;
   border-radius: 12px;
   background: var(--error-soft);
   color: var(--error);
-  font-size: 0.82rem;
+  font-size: 0.81rem;
 }
 
-.setup-error p { margin: 0 0 4px; }
+.setup-error p { margin: 0 0 2px; }
+
+/* --- Password requirements ----------------------------------------------- */
+
+/* Collapsed by default so the registration card stays short. The list is only
+   clipped, never removed, so it is still described by the password field. */
+.password-requirements {
+  margin: 8px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--teal-50);
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.requirements-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 650;
+  text-align: left;
+}
+
+.requirements-toggle:hover { color: var(--teal); }
+
+.requirements-caret {
+  margin-left: auto;
+  color: var(--teal-600);
+  transition: transform 220ms ease;
+}
+
+.requirements-toggle[aria-expanded='true'] .requirements-caret { transform: rotate(180deg); }
+
+.requirements-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms ease;
+}
+
+.password-requirements[data-open] .requirements-body { grid-template-rows: 1fr; }
+.requirements-body > div { overflow: hidden; }
+.requirements-body ul { margin: 0; padding: 0 14px 10px 28px; }
+.requirements-body li { margin-bottom: 2px; }
+.requirements-body p { margin: 0; padding: 0 14px 10px 28px; }
 
 /* --- Buttons ------------------------------------------------------------- */
 
@@ -459,38 +459,39 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   justify-content: center;
   gap: 10px;
   width: 100%;
-  min-height: 52px;
+  min-height: 48px;
+  margin-top: 14px;
   padding: 12px 18px;
-  border: 1px solid var(--forest);
+  border: 1px solid var(--teal);
   border-radius: var(--radius-control);
-  background: linear-gradient(160deg, var(--forest-600), var(--forest));
-  box-shadow: 0 10px 22px -14px rgb(18 54 45 / 90%);
+  background: linear-gradient(160deg, var(--teal-600), var(--teal));
+  box-shadow: 0 10px 22px -14px rgb(9 40 55 / 90%);
   color: #fff;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 650;
-  transition: transform 140ms ease, box-shadow 180ms ease, filter 180ms ease, background-color 180ms ease;
+  transition: transform 140ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
 .submit-button:hover:not(:disabled) {
-  box-shadow: 0 14px 28px -14px rgb(18 54 45 / 95%);
-  filter: brightness(1.12);
+  box-shadow: 0 16px 30px -14px rgb(9 40 55 / 95%);
+  filter: brightness(1.14);
 }
 
-.submit-button:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 6px 14px -12px rgb(18 54 45 / 90%); }
-.submit-button:focus-visible { outline-color: var(--forest); outline-offset: 3px; }
+.submit-button:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 6px 14px -12px rgb(9 40 55 / 90%); }
+.submit-button:focus-visible { outline-color: var(--teal); outline-offset: 3px; }
 
 .submit-button:disabled {
-  border-color: #7d9289;
-  background: #7d9289;
+  border-color: #7f8d94;
+  background: #7f8d94;
   box-shadow: none;
   color: #fff;
 }
 
 /* Nothing left to save: a calm confirmation rather than a greyed-out control. */
 .submit-button.is-saved:disabled {
-  border-color: var(--mint-200);
-  background: var(--mint-100);
-  color: var(--forest);
+  border-color: var(--teal-100);
+  background: var(--teal-100);
+  color: var(--teal);
   cursor: default;
 }
 
@@ -509,61 +510,56 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   animation: spin 700ms linear infinite;
 }
 
-.secondary-button, .status-card button {
-  min-height: 44px;
-  margin-left: -12px;
-  padding: 8px 12px;
+.secondary-button {
+  min-height: 40px;
+  margin: 4px 0 0 -10px;
+  padding: 6px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--forest-600);
+  color: var(--teal-600);
   font-weight: 650;
   text-decoration: underline;
   text-underline-offset: 3px;
   transition: background-color 170ms ease, color 170ms ease;
 }
 
-.secondary-button:hover, .status-card button:hover:not(:disabled) {
-  background: var(--mint-100);
-  color: var(--forest);
-}
-
-.status-card button:disabled { color: var(--ink-soft); text-decoration: none; }
+.secondary-button:hover { background: var(--teal-100); color: var(--teal); }
 
 .ghost-button {
-  min-height: 44px;
-  padding: 10px 18px;
+  min-height: 42px;
+  padding: 9px 18px;
   border: 1.5px solid var(--line-strong);
   border-radius: 999px;
   background: transparent;
-  color: var(--forest);
-  font-size: 0.83rem;
+  color: var(--teal);
+  font-size: 0.82rem;
   font-weight: 650;
   transition: background-color 170ms ease, border-color 170ms ease, transform 140ms ease;
 }
 
-.ghost-button:hover:not(:disabled) { border-color: var(--forest); background: var(--mint-100); }
+.ghost-button:hover:not(:disabled) { border-color: var(--teal); background: var(--teal-100); }
 .ghost-button:active:not(:disabled) { transform: translateY(1px); }
 .ghost-button:disabled { border-color: var(--line); color: var(--ink-soft); }
 
 .link-button {
   display: inline-flex;
   align-items: center;
-  min-height: 46px;
-  margin-top: 10px;
+  min-height: 44px;
+  margin-top: 12px;
   padding: 11px 20px;
-  border: 1.5px solid var(--forest);
+  border: 1.5px solid var(--teal);
   border-radius: 999px;
-  color: var(--forest);
-  font-size: 0.86rem;
+  color: var(--teal);
+  font-size: 0.85rem;
   font-weight: 650;
   text-decoration: none;
   transition: background-color 170ms ease, color 170ms ease;
 }
 
-.link-button:hover { background: var(--forest); color: #fff; }
+.link-button:hover { background: var(--teal); color: #fff; }
 
-.form-note { margin: 14px 0 0; color: var(--ink-soft); font-size: 0.75rem; text-align: center; }
+.form-note { margin: 12px 0 0; color: var(--ink-soft); font-size: 0.75rem; text-align: center; }
 .form-note a { font-weight: 650; }
 
 /* --- Profile (US-04) ----------------------------------------------------- */
@@ -572,17 +568,17 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 12px;
-  margin-bottom: 24px;
-  padding: 14px 16px;
-  border: 1px solid var(--mint-200);
-  border-radius: 14px;
-  background: linear-gradient(120deg, var(--mint-50), rgb(255 253 248 / 60%));
+  gap: 2px 12px;
+  margin-bottom: 15px;
+  padding: 10px 13px;
+  border: 1px solid var(--teal-100);
+  border-radius: 12px;
+  background: linear-gradient(120deg, var(--teal-50), rgb(255 253 249 / 70%));
 }
 
 .account-label {
   color: var(--ink-soft);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -590,7 +586,7 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
 
 .account-email {
   margin: 0;
-  font-size: 0.97rem;
+  font-size: 0.94rem;
   font-weight: 650;
   overflow-wrap: anywhere;
 }
@@ -599,25 +595,25 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
 
 .profile-options legend {
   padding: 0;
-  margin-bottom: 12px;
-  font-size: 0.83rem;
+  margin-bottom: 10px;
+  font-size: 0.81rem;
   font-weight: 650;
 }
 
-.option-list { display: grid; gap: 10px; }
+.option-list { display: grid; gap: 7px; }
 
 .profile-option {
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 14px;
+  gap: 12px;
   align-items: start;
-  padding: 15px 17px;
+  padding: 11px 14px;
   border: 1.5px solid var(--line);
-  border-radius: 15px;
-  background: var(--surface);
+  border-radius: 13px;
+  background: var(--surface-solid);
   cursor: pointer;
-  animation: rise 360ms cubic-bezier(0.22, 0.85, 0.3, 1) var(--stagger, 0ms) both;
+  animation: rise 420ms var(--camera-ease) calc(var(--stagger, 0ms) + 200ms) both;
   transition: border-color 170ms ease, background-color 170ms ease,
     box-shadow 200ms ease, transform 170ms ease;
 }
@@ -631,32 +627,31 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
 }
 
 .profile-option:hover {
-  border-color: var(--forest-400);
-  background: var(--mint-50);
+  border-color: var(--teal-600);
+  background: var(--teal-50);
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px -18px rgb(18 54 45 / 70%);
+  box-shadow: 0 12px 24px -18px rgb(9 40 55 / 70%);
 }
 
 .profile-option:active { transform: translateY(0); }
 
 .profile-option:has(input:checked) {
-  border-color: var(--forest);
-  background: var(--mint-100);
-  box-shadow: inset 0 0 0 1px var(--forest), 0 14px 30px -20px rgb(18 54 45 / 75%);
+  border-color: var(--teal);
+  background: var(--teal-100);
+  box-shadow: inset 0 0 0 1px var(--teal), 0 14px 30px -20px rgb(9 40 55 / 75%);
 }
 
 .profile-option:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 3px; }
-.profile-options:disabled .profile-option { cursor: default; opacity: 0.7; }
 
 .option-mark {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  margin-top: 3px;
+  width: 21px;
+  height: 21px;
+  margin-top: 2px;
   border: 1.8px solid var(--line-strong);
   border-radius: 50%;
-  background: var(--surface);
+  background: var(--surface-solid);
   transition: border-color 170ms ease;
 }
 
@@ -665,13 +660,13 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--forest);
+  background: var(--teal);
   transform: scale(0);
   transition: transform 190ms cubic-bezier(0.34, 1.6, 0.64, 1);
 }
 
-.profile-option:hover .option-mark { border-color: var(--forest-400); }
-.profile-option:has(input:checked) .option-mark { border-color: var(--forest); }
+.profile-option:hover .option-mark { border-color: var(--teal-600); }
+.profile-option:has(input:checked) .option-mark { border-color: var(--teal); }
 .profile-option:has(input:checked) .option-mark::after { transform: scale(1); }
 
 .option-body { display: block; }
@@ -680,111 +675,147 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 0.97rem;
+  font-size: 0.94rem;
   font-weight: 680;
 }
 
-.option-icon { width: 19px; height: 19px; color: var(--forest-400); transition: color 170ms ease; }
-.profile-option:has(input:checked) .option-icon { color: var(--forest); }
+.option-icon { width: 18px; height: 18px; color: var(--teal-600); transition: color 170ms ease; }
+.profile-option:has(input:checked) .option-icon { color: var(--teal); }
 
 .option-text {
   display: block;
-  margin-top: 3px;
+  margin-top: 2px;
   color: var(--ink-soft);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .option-note {
-  margin: 12px 0 18px;
-  padding-left: 12px;
+  margin: 10px 0 0;
+  padding-left: 11px;
   border-left: 2px solid var(--amber-soft);
   color: var(--ink-soft);
-  font-size: 0.74rem;
-  line-height: 1.55;
+  font-size: 0.72rem;
+  line-height: 1.5;
 }
 
 .confirmation { min-height: 1.5em; color: var(--ok); font-weight: 650; }
-.confirmation:not(:empty) { animation: rise 280ms ease-out both; }
+.confirmation:not(:empty) { animation: rise 320ms ease-out both; }
 
 .panel-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-top: 26px;
-  padding-top: 20px;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
 }
 
-.panel-footer p { margin: 0; max-width: 24ch; color: var(--ink-soft); font-size: 0.73rem; }
-
 /* --- Registration success ------------------------------------------------ */
 
-.success-panel { padding: 20px 0 30px; overflow-wrap: anywhere; }
+.success-panel { padding: 8px 0 6px; overflow-wrap: anywhere; }
 
 .success-icon {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
-  background: var(--mint-100);
-  color: var(--forest);
-  animation: pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  background: var(--teal-100);
+  color: var(--teal);
+  animation: pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-.success-icon svg { width: 26px; height: 26px; }
-.success-panel h3 { margin: 18px 0 8px; font-size: 1.35rem; letter-spacing: -0.02em; }
+.success-icon svg { width: 25px; height: 25px; }
+.success-icon svg path { stroke-dasharray: 22; animation: draw 480ms ease-out 220ms both; }
+.success-panel h3 { margin: 15px 0 7px; font-size: 1.28rem; letter-spacing: -0.02em; }
 .success-panel h3:focus-visible { outline-offset: 5px; }
-.success-panel p { margin: 0 0 6px; color: var(--ink-soft); font-size: 0.9rem; }
+.success-panel p { margin: 0 0 5px; color: var(--ink-soft); font-size: 0.88rem; }
 
 /* --- Footer and service status ------------------------------------------- */
 
 .site-footer {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 28px;
-  padding: 22px 0 30px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-soft);
-  font-size: 0.75rem;
+  gap: 12px 24px;
+  padding: 12px 0 16px;
+  color: rgb(255 255 255 / 88%);
+  font-size: 0.73rem;
 }
 
-.footer-brand p { margin: 0; font-weight: 650; color: var(--ink); }
-.footer-note { margin-top: 4px !important; font-weight: 400 !important; color: var(--ink-soft) !important; }
+.footer-note {
+  margin: 0;
+  padding: 7px 14px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 999px;
+  background: rgb(11 32 45 / 46%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
 
-.status-card { max-width: 400px; }
+/* Available from the header link, but visually secondary to the campus. */
+.status-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 11px;
+  margin-left: auto;
+  padding: 6px 8px 6px 13px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 999px;
+  background: rgb(11 32 45 / 50%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  scroll-margin-top: 20px;
+}
+
+.status-card:focus-visible { outline-offset: 4px; }
 
 .status-card h2 {
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: 0.73rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  scroll-margin-top: 20px;
+  color: inherit;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--line-strong);
+  background: rgb(255 255 255 / 55%);
   transition: background-color 250ms ease;
 }
 
-.status-dot.ok { background: var(--ok); }
-.status-dot.error { background: var(--error); }
+.status-dot.ok { background: #74d6ab; }
+.status-dot.error { background: #ff9d92; }
 .status-dot.loading { animation: pulse 1.4s ease-in-out infinite; }
 
-.status { min-height: 1.6em; margin: 6px 0; }
-.status.ok { color: var(--ok); }
-.status.error { color: var(--error); }
+.status { margin: 0; max-width: 46ch; }
+.status.ok { color: #a6e8ca; }
+.status.error { color: #ffb8af; }
+
+.status-card button {
+  min-height: 32px;
+  padding: 3px 12px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  transition: background-color 170ms ease, border-color 170ms ease;
+}
+
+.status-card button:hover:not(:disabled) { border-color: rgb(255 255 255 / 62%); background: rgb(255 255 255 / 20%); }
+.status-card button:disabled { opacity: 0.65; }
 
 /* --- Utilities ----------------------------------------------------------- */
 
@@ -796,7 +827,7 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   padding: 12px 16px;
   border-radius: 0 0 10px 10px;
   background: var(--surface);
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--shadow-card);
   font-weight: 650;
 }
 
@@ -817,18 +848,28 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
 /* --- Motion -------------------------------------------------------------- */
 
 @keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(9px); }
   to { opacity: 1; transform: none; }
 }
 
 @keyframes panel-in {
-  from { opacity: 0; transform: translateY(14px) scale(0.988); }
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes caption-in {
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
 
 @keyframes pop {
-  from { opacity: 0; transform: scale(0.7); }
+  from { opacity: 0; transform: scale(0.72); }
   to { opacity: 1; transform: none; }
+}
+
+@keyframes draw {
+  from { stroke-dashoffset: 22; }
+  to { stroke-dashoffset: 0; }
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -838,44 +879,63 @@ input[readonly] { background: var(--mint-50); color: var(--ink-soft); }
   50% { opacity: 0.35; }
 }
 
-@keyframes shake {
+@keyframes nudge {
   0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
+  30% { transform: translateX(-3px); }
+  70% { transform: translateX(3px); }
 }
 
 /* --- Responsive ---------------------------------------------------------- */
 
-@media (max-width: 1000px) {
-  .page-shell { padding: 0 32px; }
-  .auth-layout { gap: 36px; }
+@media (max-width: 1040px) {
+  .viewpoint-place { font-size: 1.1rem; }
 }
 
 @media (max-width: 860px) {
-  .page-shell { max-width: 640px; padding: 0 28px; }
-  .site-header { padding: 18px 0; }
-  .auth-layout { grid-template-columns: 1fr; gap: 26px; padding: 28px 0 36px; align-items: start; }
-  h1 { font-size: clamp(2rem, 7.4vw, 2.5rem); margin-bottom: 14px; }
-  .introduction .eyebrow { margin-bottom: 12px; }
-  .intro { max-width: none; font-size: 0.94rem; }
-  .intro-note, .project-note, .desktop-break { display: none; }
-  .panel { border-radius: 18px; }
-  .backdrop-skyline { height: min(34vh, 300px); opacity: 0.6; }
-  .site-footer { flex-direction: column; gap: 22px; }
-  .status-card { max-width: none; }
+  .page-shell { max-width: 620px; }
+  main {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 16px;
+    padding: 6px 0 18px;
+  }
+  .viewpoint {
+    order: -1;
+    justify-self: start;
+    align-self: start;
+    max-width: none;
+    padding: 7px 15px 9px;
+    border: 1px solid rgb(255 255 255 / 14%);
+    border-radius: 16px;
+    background: rgb(11 32 45 / 48%);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    text-align: left;
+    text-shadow: none;
+  }
+  .viewpoint-detail { margin-top: 2px; font-size: 0.62rem; }
+  .viewpoint-place { font-size: 1.05rem; }
+  .panel { border-radius: 17px; }
+  .site-footer { gap: 10px; }
+  .status-card { margin-left: 0; }
 }
 
-@media (max-width: 420px) {
-  .page-shell { padding: 0 16px; }
-  .panel { padding: 22px 18px; }
-  .brand-mark { flex: none; width: 44px; height: 46px; border-radius: 13px; font-size: 0.8rem; }
-  .brand-name { font-size: 0.9rem; }
+@media (max-width: 480px) {
+  .brand { padding: 6px 14px 6px 7px; border-radius: 17px; }
+  .brand-logo { width: 40px; height: 40px; }
+  .brand-name { font-size: 0.88rem; }
   .brand-name span { font-size: 0.52rem; letter-spacing: 0.1em; }
-  .status-link { padding: 10px 11px; font-size: 0.7rem; }
-  .profile-option { padding: 14px; gap: 11px; }
-  .panel-footer { flex-direction: column; align-items: stretch; }
+  .status-link { padding: 9px 12px; font-size: 0.7rem; }
+  .panel { padding: 20px 17px; }
+  .profile-option { padding: 12px; gap: 11px; }
+  .panel-footer { justify-content: stretch; }
   .panel-footer .ghost-button { width: 100%; }
-  .panel-footer p { max-width: none; }
+  .status { max-width: none; }
+}
+
+/* Text zoom and short windows: let the page scroll rather than clip controls. */
+@media (max-height: 760px) {
+  main { align-items: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

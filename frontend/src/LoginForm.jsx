@@ -67,8 +67,8 @@ export default function LoginForm({ onLogin, notice }) {
   return (
     <section className="panel" id="login" aria-labelledby="login-title">
       <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Welcome back</p>
-      <h2 id="login-title">Sign in</h2>
-      <p className="card-description">Use your email to return to your campus account.</p>
+      <h1 id="login-title">Sign in</h1>
+      <p className="card-description">Sign in to your campus account.</p>
       {notice && <p className="notice" role="status">{notice}</p>}
       <form onSubmit={submit} aria-busy={pending}>
         <p className="required-note">All fields are required.</p>

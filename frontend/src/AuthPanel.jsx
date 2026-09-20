@@ -4,31 +4,7 @@ import ProfilePanel from './ProfilePanel.jsx';
 import RegistrationForm from './RegistrationForm.jsx';
 import { authRequest, isSession } from './auth.js';
 
-const INTRO = {
-  register: {
-    eyebrow: 'Your campus, a little closer',
-    title: <>Welcome to your<br className="desktop-break" /> campus community.</>,
-    lead: 'SDU Campus Assistant is taking shape: one place to find your way around '
-      + 'campus, look up university services, and keep track of your schedule.',
-    note: 'Create an account to reserve your place. It takes about a minute.',
-  },
-  login: {
-    eyebrow: 'Welcome back',
-    title: <>Good to see you<br className="desktop-break" /> on campus again.</>,
-    lead: 'Sign in with the email you registered. Your session is restored on this device '
-      + 'until you sign out.',
-    note: 'Signing in brings back your saved campus profile.',
-  },
-  profile: {
-    eyebrow: 'You’re signed in',
-    title: <>Let’s set up<br className="desktop-break" /> your campus profile.</>,
-    lead: 'Your affiliation tells the assistant which parts of campus life are most '
-      + 'relevant to you, from lecture halls to visitor entrances.',
-    note: 'Your choice is saved to your account and restored every time you sign in.',
-  },
-};
-
-export default function AuthPanel() {
+export default function AuthPanel({ onView }) {
   const [state, setState] = useState({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [page, setPage] = useState(window.location.hash === '#login' ? 'login' : 'register');
@@ -64,7 +40,7 @@ export default function AuthPanel() {
     return () => controller.abort();
   }, [attempt]);
 
-  let view = 'register';
+  let view = null;
   let content;
   if (state.status === 'authenticated') {
     view = 'profile';
@@ -78,7 +54,6 @@ export default function AuthPanel() {
       }} />
       : <RegistrationForm />;
   } else {
-    view = state.status;
     content = (
       <section className="panel panel-waiting" aria-label="Account status">
         {state.status === 'loading' ? (
@@ -97,20 +72,9 @@ export default function AuthPanel() {
     );
   }
 
-  const intro = INTRO[view] || INTRO.register;
-  return (
-    <div className="auth-layout">
-      <section className="introduction" key={intro.eyebrow} aria-labelledby="project-title">
-        <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />{intro.eyebrow}</p>
-        <h1 id="project-title">{intro.title}</h1>
-        <p className="intro">{intro.lead}</p>
-        <p className="intro-note">{intro.note}</p>
-        <div className="project-note">
-          <span className="note-line" aria-hidden="true" />
-          <p>Built for everyday campus life.<br /><span>Made by a university team.</span></p>
-        </div>
-      </section>
-      <div id="authentication" tabIndex="-1" key={view}>{content}</div>
-    </div>
-  );
+  // The camera follows navigation. Session checking and its error state hold
+  // whichever viewpoint is already framed rather than adding a camera move.
+  useEffect(() => { if (view) onView(view); }, [onView, view]);
+
+  return <div id="authentication" tabIndex="-1" key={view || state.status}>{content}</div>;
 }

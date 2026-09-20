@@ -38,11 +38,11 @@ export default function ServiceStatus() {
   const statusText = {
     loading: 'Checking backend connection…',
     ok: 'Backend and database are online.',
-    error: 'Cannot reach a healthy backend. Check that Django and PostgreSQL are running, then try again.',
+    error: 'Cannot reach a healthy backend. Check that Django and PostgreSQL are running.',
   };
 
   return (
-    <section className="status-card" aria-labelledby="status-title">
+    <section className="status-card" aria-labelledby="status-title" tabIndex="-1">
       <h2 id="status-title">
         <span className={`status-dot ${status}`} aria-hidden="true" />Service status
       </h2>

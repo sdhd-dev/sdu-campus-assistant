@@ -1,17 +1,36 @@
+import { useState } from 'react';
 import AuthPanel from './AuthPanel.jsx';
-import CampusBackdrop from './CampusBackdrop.jsx';
+import CampusPhoto from './campus/CampusPhoto.jsx';
 import ServiceStatus from './ServiceStatus.jsx';
+import { DEFAULT_VIEW, viewpointFor } from './campus/viewpoints.js';
+import useCalmMotion from './campus/useCalmMotion.js';
 
 export default function App() {
+  // The photograph lives here, beside the shell, so moving between login,
+  // registration, and the profile only re-frames it.
+  const [view, setView] = useState(
+    () => (window.location.hash === '#login' ? 'login' : 'register'),
+  );
+  const calm = useCalmMotion();
+  // The caption names where the camera actually is, including when it is parked.
+  const place = viewpointFor(calm ? DEFAULT_VIEW : view);
+
   return (
     <>
-      {/* A sibling of the shell, so no page content depends on a negative z-index. */}
-      <CampusBackdrop />
+      <CampusPhoto view={view} />
       <div className="page-shell">
         <a className="skip-link" href="#authentication">Skip to account</a>
         <header className="site-header">
           <a className="brand" href="#authentication">
-            <span className="brand-mark" aria-hidden="true">SDU</span>
+            <span className="brand-plate">
+              <img
+                className="brand-logo"
+                src="/brand/sdu-university-logo.svg"
+                alt="SDU University"
+                width="54"
+                height="54"
+              />
+            </span>
             <span className="brand-name">
               Campus Assistant
               <span>University team project</span>
@@ -22,15 +41,14 @@ export default function App() {
           </a>
         </header>
         <main>
-          <AuthPanel />
+          <AuthPanel onView={setView} />
+          <p className="viewpoint" key={place.place}>
+            <span className="viewpoint-place">{place.place}</span>
+            <span className="viewpoint-detail">{place.detail}</span>
+          </p>
         </main>
         <footer className="site-footer">
-          <div className="footer-brand">
-            <p>SDU Campus Assistant</p>
-            <p className="footer-note">
-              Sprint 1: accounts and profiles. Campus features are in progress.
-            </p>
-          </div>
+          <p className="footer-note">Sprint 1: accounts and profiles.</p>
           <ServiceStatus />
         </footer>
       </div>
