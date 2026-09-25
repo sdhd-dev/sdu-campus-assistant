@@ -106,22 +106,32 @@ class RecoveryCode(models.Model):
         ]
 
 
-class UniversityEmailChallenge(models.Model):
-    """The one pending university email code for a user. Only a keyed digest is stored."""
+class EmailCode(models.Model):
+    """A user's pending one-time email code for one purpose. Only a keyed digest is stored."""
 
-    user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name="university_email_challenge",
-    )
+    class Purpose(models.TextChoices):
+        ROLE = "role", "Role verification"
+        SIGN_IN = "sign_in", "Sign-in second step"
+        SECURITY = "security", "Two-step verification change"
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="email_codes")
+    purpose = models.CharField(max_length=16, choices=Purpose.choices)
     email = models.EmailField(max_length=254)
     code_hash = models.CharField(max_length=64)
     expires_at = models.DateTimeField()
     failed_attempts = models.PositiveSmallIntegerField(default=0)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "purpose"], name="accounts_email_code_one_per_purpose"),
+        ]
 
-class UniversityEmailSend(models.Model):
+
+class EmailCodeSend(models.Model):
     """One code request, kept for an hour to rate-limit per account and per address."""
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    purpose = models.CharField(max_length=16, choices=EmailCode.Purpose.choices)
     # A keyed digest, so the table does not collect addresses.
     email_digest = models.CharField(max_length=64, db_index=True)
     sent_at = models.DateTimeField(db_index=True)

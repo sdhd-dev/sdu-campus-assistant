@@ -11,8 +11,8 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from . import google, university
-from .models import UniversityEmailChallenge, UniversityEmailSend
+from . import email_codes, google, university
+from .models import EmailCode, EmailCodeSend
 
 User = get_user_model()
 STUDENT_EMAIL = "a.student@stu.sdu.edu.kz"
@@ -41,7 +41,7 @@ class UniversityEmailTests(TestCase):
 
     def setUp(self):
         self.now = timezone.now()
-        clock = patch("accounts.university.timezone.now", side_effect=lambda: self.now)
+        clock = patch("accounts.email_codes.timezone.now", side_effect=lambda: self.now)
         clock.start()
         self.addCleanup(clock.stop)
         self.capture = Capture()
@@ -119,7 +119,7 @@ class UniversityEmailTests(TestCase):
             with self.subTest(payload=payload):
                 self.assertEqual(self.post("verification-start", payload).status_code, 400)
         self.assertEqual(len(mail.outbox), 0)
-        self.assertFalse(UniversityEmailChallenge.objects.exists())
+        self.assertFalse(EmailCode.objects.exists())
 
     def test_code_is_sent_and_only_a_digest_is_stored(self):
         response = self.start("  A.Student@STU.sdu.edu.kz ")
@@ -127,7 +127,7 @@ class UniversityEmailTests(TestCase):
         self.assertEqual(response.json()["pending_email"], STUDENT_EMAIL)
         self.assertEqual(mail.outbox[0].to, [STUDENT_EMAIL])
         code = self.last_code()
-        challenge = UniversityEmailChallenge.objects.get(user=self.user)
+        challenge = EmailCode.objects.get(user=self.user)
         self.assertEqual(len(challenge.code_hash), 64)
         self.assertNotIn(code, challenge.code_hash)
         self.assertEqual(len(self.logged("code_sent")), 1)
@@ -174,10 +174,10 @@ class UniversityEmailTests(TestCase):
         self.assertEqual(len(mail.outbox), 5)
 
     def test_mail_failure_is_503_and_records_nothing(self):
-        with patch("accounts.university._send", side_effect=smtplib.SMTPException("x@stu.sdu.edu.kz")):
+        with patch("accounts.email_codes._send", side_effect=smtplib.SMTPException("x@stu.sdu.edu.kz")):
             self.assertEqual(self.start().status_code, 503)
-        self.assertFalse(UniversityEmailChallenge.objects.exists())
-        self.assertFalse(UniversityEmailSend.objects.exists())
+        self.assertFalse(EmailCode.objects.exists())
+        self.assertFalse(EmailCodeSend.objects.exists())
         self.assertEqual(self.logged("code_send_failed")[0].split()[-1], "error=SMTPException")
         self.assertEqual(self.start().status_code, 200)
 
@@ -210,7 +210,7 @@ class UniversityEmailTests(TestCase):
 
     def test_code_expires(self):
         self.start()
-        self.now += university.CODE_LIFETIME
+        self.now += email_codes.CODE_LIFETIME
         response = self.confirm(self.last_code())
         self.assertEqual(response.status_code, 400)
         self.assertIn("expired", response.json()["detail"])
