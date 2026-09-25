@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import patch
 
 import pyotp
@@ -8,6 +9,7 @@ from google.auth import exceptions as google_exceptions
 from rest_framework.test import APIClient
 
 from .models import TOTPDevice
+from .test_university import Capture
 
 User = get_user_model()
 CLIENT_ID = "test-client.apps.googleusercontent.com"
@@ -26,6 +28,9 @@ class GoogleSignInTests(TestCase):
         verifier = patch("accounts.google.id_token.verify_oauth2_token", side_effect=self.verify)
         self.verify_mock = verifier.start()
         self.addCleanup(verifier.stop)
+        logs = patch.object(logging.getLogger("accounts"), "handlers", [Capture()])
+        logs.start()
+        self.addCleanup(logs.stop)
         self.prepare()
 
     def verify(self, credential, request, audience, **kwargs):

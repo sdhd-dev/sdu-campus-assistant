@@ -140,7 +140,7 @@ is wired into sign-in yet.
 npm --prefix frontend run build
 ```
 
-All 101 backend tests pass against PostgreSQL, 22 of them for this story. They
+All 103 backend tests pass against PostgreSQL, 22 of them for this story. They
 cover:
 - the feature switch, session, and CSRF
 - exact domains and input rejection

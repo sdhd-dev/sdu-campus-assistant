@@ -1,6 +1,7 @@
 """Optional TOTP two-factor authentication with single-use recovery codes."""
 import hashlib
 import hmac
+import logging
 import re
 import secrets
 from datetime import timedelta
@@ -20,6 +21,8 @@ RECOVERY_CODE_COUNT = 10
 RECOVERY_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
 
 OK, INVALID, LOCKED = "ok", "invalid", "locked"
+# Security events only: user id, event, and counters. Never codes, secrets, or addresses.
+log = logging.getLogger("accounts.two_factor")
 
 
 def _digest(code):
@@ -59,7 +62,7 @@ def _matches_recovery(user, code, now):
     ).update(used_at=now) == 1
 
 
-def check_code(user, code, *, allow_recovery=True, confirmed=True):
+def check_code(user, code, *, allow_recovery=True, confirmed=True, purpose="sign_in"):
     """Checks an authenticator (or recovery) code, with replay and lockout protection."""
     code = code.strip() if isinstance(code, str) else ""
     now = timezone.now()
@@ -71,17 +74,32 @@ def check_code(user, code, *, allow_recovery=True, confirmed=True):
         if device is None:
             return INVALID
         if device.locked_until and device.locked_until > now:
+            log.warning("code_refused_locked user=%s purpose=%s", user.pk, purpose)
             return LOCKED
-        if _matches_totp(device, code, now) or (allow_recovery and _matches_recovery(user, code, now)):
+        method = "totp" if _matches_totp(device, code, now) else None
+        if method is None and allow_recovery and _matches_recovery(user, code, now):
+            method = "recovery"
+        if method:
             device.failed_attempts = 0
             device.locked_until = None
             device.save(update_fields=["last_used_step", "failed_attempts", "locked_until"])
+            if method == "recovery":
+                log.warning("recovery_code_used user=%s purpose=%s remaining=%s",
+                            user.pk, purpose, recovery_codes_remaining(user))
+            else:
+                log.info("code_accepted user=%s purpose=%s", user.pk, purpose)
             return OK
         device.failed_attempts += 1
-        if device.failed_attempts >= MAX_FAILURES:
+        attempts = device.failed_attempts
+        locked = attempts >= MAX_FAILURES
+        if locked:
             device.failed_attempts = 0
             device.locked_until = now + LOCKOUT
         device.save(update_fields=["failed_attempts", "locked_until"])
+        log.info("code_invalid user=%s purpose=%s attempts=%s", user.pk, purpose, attempts)
+        if locked:
+            log.warning("locked user=%s purpose=%s minutes=%s",
+                        user.pk, purpose, int(LOCKOUT.total_seconds() // 60))
         return INVALID
 
 
@@ -95,6 +113,7 @@ def start_setup(user):
         "failed_attempts": 0, "locked_until": None,
     })
     uri = pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name=ISSUER)
+    log.info("setup_started user=%s", user.pk)
     return {
         "secret": secret,
         "otpauth_uri": uri,
@@ -104,7 +123,7 @@ def start_setup(user):
 
 def confirm_setup(user, code):
     """Enables 2FA once the new device produces a valid code. Returns (result, recovery_codes)."""
-    result = check_code(user, code, allow_recovery=False, confirmed=False)
+    result = check_code(user, code, allow_recovery=False, confirmed=False, purpose="enable")
     if result != OK:
         return result, None
     codes = [_new_recovery_code() for _ in range(RECOVERY_CODE_COUNT)]
@@ -115,15 +134,17 @@ def confirm_setup(user, code):
             RecoveryCode(user=user, code_hash=_digest(_normalize_recovery(value)))
             for value in codes
         )
+    log.info("enabled user=%s recovery_codes=%s", user.pk, len(codes))
     return OK, codes
 
 
 def disable(user, code):
-    result = check_code(user, code)
+    result = check_code(user, code, purpose="disable")
     if result == OK:
         with transaction.atomic():
             TOTPDevice.objects.filter(user=user).delete()
             RecoveryCode.objects.filter(user=user).delete()
+        log.info("disabled user=%s", user.pk)
     return result
 
 

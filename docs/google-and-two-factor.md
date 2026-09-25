@@ -70,6 +70,22 @@ the pending sign-in expires after five minutes.
   Case, spaces, and dashes are ignored when entering them.
 - 2FA applies to Google sign-in too.
 
+## Logging
+
+Two-step verification events go to the console through the `accounts.two_factor`
+logger. Each line contains only the user id, the event, the `purpose`
+(`sign_in`, `enable`, or `disable`), and counters. Codes, TOTP secrets,
+`otpauth://` URIs, recovery codes, and email addresses are never logged. Tests check
+every log line of every 2FA test for them.
+
+| Event | Level |
+| --- | --- |
+| `setup_started`, `enabled`, `disabled` | INFO |
+| `code_accepted` (authenticator code) | INFO |
+| `code_invalid` (with attempt number) | INFO |
+| `recovery_code_used` (with codes remaining) | WARNING |
+| `locked` (fifth wrong code), `code_refused_locked` (attempt during lockout) | WARNING |
+
 ## Verification
 
 ```sh
@@ -80,7 +96,7 @@ the pending sign-in expires after five minutes.
 npm --prefix frontend run build
 ```
 
-All 79 backend tests pass against PostgreSQL. Google's verifier is mocked in tests;
+All backend tests pass against PostgreSQL. Google's verifier is mocked in tests;
 a real Google sign-in needs a configured client ID and has not been run end to end.
 
 ## Manual checklist

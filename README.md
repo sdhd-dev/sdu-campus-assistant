@@ -214,7 +214,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 101 backend tests pass (`accounts` and `core`). Quick manual pass:
+All 103 backend tests pass (`accounts` and `core`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 

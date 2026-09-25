@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import RecoveryCode, TOTPDevice
+from .test_university import Capture
 
 User = get_user_model()
 
@@ -25,6 +27,22 @@ class TwoFactorTests(TestCase):
         clock = patch("accounts.two_factor.timezone.now", side_effect=lambda: self.now)
         clock.start()
         self.addCleanup(clock.stop)
+        # Every value that must never reach a log line; checked after each test.
+        self.secrets = {self.user.email, self.password}
+        self.capture = Capture()
+        logs = patch.object(logging.getLogger("accounts"), "handlers", [self.capture])
+        logs.start()
+        self.addCleanup(logs.stop)
+        self.addCleanup(self.assertLogsHideSecrets)
+
+    def assertLogsHideSecrets(self):
+        for message in self.capture.messages:
+            for secret in self.secrets:
+                self.assertNotIn(secret, message)
+            self.assertNotIn(self.user.email.split("@")[0], message)
+
+    def events(self):
+        return [message.split()[0] for message in self.capture.messages]
 
     def post(self, name, payload=None, client=None, token=None):
         return (client or self.client).post(
@@ -39,7 +57,9 @@ class TwoFactorTests(TestCase):
         return response
 
     def code(self, secret, offset=0):
-        return pyotp.TOTP(secret).at(self.now + timedelta(seconds=offset))
+        code = pyotp.TOTP(secret).at(self.now + timedelta(seconds=offset))
+        self.secrets.add(code)
+        return code
 
     def enable(self):
         """Signs in, turns 2FA on, signs out. Returns (secret, recovery codes)."""
@@ -47,12 +67,16 @@ class TwoFactorTests(TestCase):
         setup = self.post("two-factor-setup")
         self.assertEqual(setup.status_code, 200)
         secret = setup.json()["secret"]
+        self.secrets.update({secret, setup.json()["otpauth_uri"]})
         enabled = self.post("two-factor-enable", {"code": self.code(secret)})
         self.assertEqual(enabled.status_code, 200)
         self.post("logout")
         self.client = APIClient(enforce_csrf_checks=True)
         self.now += timedelta(seconds=30)
-        return secret, enabled.json()["recovery_codes"]
+        codes = enabled.json()["recovery_codes"]
+        self.secrets.update(codes)
+        self.secrets.update(code.replace("-", "") for code in codes)
+        return secret, codes
 
     # Setup
 
@@ -210,3 +234,33 @@ class TwoFactorTests(TestCase):
             "recovery_codes_remaining", "csrf_token",
         })
         self.assertTrue(body["has_password"])
+
+    # Logging
+
+    def test_security_events_are_logged_without_codes_or_secrets(self):
+        secret, codes = self.enable()
+        self.assertEqual(self.events(), ["setup_started", "code_accepted", "enabled"])
+        self.assertIn(f"user={self.user.pk} purpose=enable", self.capture.messages[1])
+        wrong = "000000" if self.code(secret) != "000000" else "111111"
+
+        self.password_login()
+        self.post("two-factor-verify", {"code": wrong})
+        self.token = self.post("two-factor-verify", {"code": f" {codes[0]} "}).json()["csrf_token"]
+        self.assertEqual(self.events()[3:], ["code_invalid", "recovery_code_used"])
+        self.assertIn("purpose=sign_in attempts=1", self.capture.messages[3])
+        self.assertIn("remaining=9", self.capture.messages[4])
+
+        self.now += timedelta(seconds=30)
+        self.post("two-factor-disable", {"code": self.code(secret)})
+        self.assertEqual(self.events()[5:], ["code_accepted", "disabled"])
+        self.assertIn("purpose=disable", self.capture.messages[5])
+
+    def test_lockout_is_logged(self):
+        secret, _ = self.enable()
+        self.password_login()
+        wrong = "000000" if self.code(secret) != "000000" else "111111"
+        for _ in range(5):
+            self.post("two-factor-verify", {"code": wrong})
+        self.post("two-factor-verify", {"code": self.code(secret)})
+        self.assertEqual(self.events()[3:], ["code_invalid"] * 5 + ["locked", "code_refused_locked"])
+        self.assertIn("attempts=5", self.capture.messages[7])
