@@ -1,34 +1,30 @@
-"""Two-step verification: an email code (main method), an optional authenticator app,
-and single-use recovery codes issued when the first method is turned on."""
+"""Two-step verification: a code sent to the account email, with single-use recovery
+codes issued when it is turned on."""
 import hashlib
-import hmac
 import logging
 import re
 import secrets
 from datetime import timedelta
 
-import pyotp
-import segno
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
 from . import email_codes
-from .models import RecoveryCode, TOTPDevice
+from .models import RecoveryCode
 
 User = get_user_model()
 
-ISSUER = "SDU Campus Assistant"
 MAX_FAILURES = 5
 LOCKOUT = timedelta(minutes=5)
 RECOVERY_CODE_COUNT = 10
 # Crockford-style alphabet: no 0/O or 1/I/L to misread when typing from paper.
 RECOVERY_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
 
-EMAIL, TOTP, RECOVERY = "email", "totp", "recovery"
+EMAIL, RECOVERY = "email", "recovery"
 OK, INVALID, LOCKED, ALREADY = "ok", "invalid", "locked", "already"
 EXPIRED, NO_CODE = email_codes.EXPIRED, email_codes.NO_CODE
-# Security events only: user id, event, method, and counters. Never codes, secrets, or addresses.
+# Security events only: user id, event, method, and counters. Never codes or addresses.
 log = logging.getLogger("accounts.two_factor")
 
 
@@ -46,7 +42,7 @@ def _new_recovery_code():
 
 
 def _fresh(user):
-    """The user's current row; cached relations such as totp_device can be stale."""
+    """The user's current row; the request's copy can be stale."""
     return User.objects.get(pk=user.pk)
 
 
@@ -60,26 +56,9 @@ def methods(user):
     available = []
     if user.email_two_factor:
         available.append(EMAIL)
-    if user.totp_enabled:
-        available.append(TOTP)
-    if user.two_factor_enabled and recovery_codes_remaining(user):
+    if user.email_two_factor and recovery_codes_remaining(user):
         available.append(RECOVERY)
     return available
-
-
-def _matches_totp(device, code, now):
-    if not re.fullmatch(r"\d{6}", code):
-        return False
-    totp = pyotp.TOTP(device.secret)
-    current = totp.timecode(now)
-    # One step either side tolerates clock drift of about 30 seconds.
-    for step in (current - 1, current, current + 1):
-        if device.last_used_step is not None and step <= device.last_used_step:
-            continue
-        if hmac.compare_digest(totp.generate_otp(step), code):
-            device.last_used_step = step
-            return True
-    return False
 
 
 def _matches_recovery(user, code, now):
@@ -91,33 +70,22 @@ def _matches_recovery(user, code, now):
     ).update(used_at=now) == 1
 
 
-def check_code(user, code, *, method, purpose, confirmed=True):
-    """Checks an authenticator or recovery code, with replay and lockout protection."""
+def check_code(user, code, *, purpose):
+    """Checks a recovery code, with lockout protection."""
     code = code.strip() if isinstance(code, str) else ""
     now = timezone.now()
     with transaction.atomic():
         # The row lock serialises concurrent attempts, so one code cannot be used twice.
         locked_user = User.objects.select_for_update().get(pk=user.pk)
         if locked_user.two_factor_locked_until and locked_user.two_factor_locked_until > now:
-            log.warning("code_refused_locked user=%s purpose=%s method=%s", user.pk, purpose, method)
+            log.warning("code_refused_locked user=%s purpose=%s method=recovery", user.pk, purpose)
             return LOCKED
-        matched = False
-        if method == TOTP:
-            device = TOTPDevice.objects.select_for_update().filter(user=user, confirmed=confirmed).first()
-            if device is not None and _matches_totp(device, code, now):
-                device.save(update_fields=["last_used_step"])
-                matched = True
-        elif method == RECOVERY:
-            matched = _matches_recovery(user, code, now)
-        if matched:
+        if _matches_recovery(user, code, now):
             User.objects.filter(pk=user.pk).update(
                 two_factor_failed_attempts=0, two_factor_locked_until=None,
             )
-            if method == RECOVERY:
-                log.warning("recovery_code_used user=%s purpose=%s remaining=%s",
-                            user.pk, purpose, recovery_codes_remaining(user))
-            else:
-                log.info("code_accepted user=%s purpose=%s method=%s", user.pk, purpose, method)
+            log.warning("recovery_code_used user=%s purpose=%s remaining=%s",
+                        user.pk, purpose, recovery_codes_remaining(user))
             return OK
         attempts = locked_user.two_factor_failed_attempts + 1
         locked = attempts >= MAX_FAILURES
@@ -125,8 +93,8 @@ def check_code(user, code, *, method, purpose, confirmed=True):
             two_factor_failed_attempts=0 if locked else attempts,
             two_factor_locked_until=now + LOCKOUT if locked else None,
         )
-        log.info("code_invalid user=%s purpose=%s method=%s attempts=%s",
-                 user.pk, purpose, method, attempts)
+        log.info("code_invalid user=%s purpose=%s method=recovery attempts=%s",
+                 user.pk, purpose, attempts)
         if locked:
             log.warning("locked user=%s purpose=%s minutes=%s",
                         user.pk, purpose, int(LOCKOUT.total_seconds() // 60))
@@ -144,7 +112,7 @@ def authorize(user, method, code, *, purpose):
         if result == OK:
             log.info("code_accepted user=%s purpose=%s method=email", user.pk, purpose)
         return result
-    return check_code(user, code, method=method, purpose=purpose)
+    return check_code(user, code, purpose=purpose)
 
 
 def send_code(user, *, sign_in):
@@ -163,13 +131,9 @@ def _issue_recovery_codes(user):
     return codes
 
 
-def _enabled(user, method, codes):
-    log.info("enabled user=%s method=%s recovery_codes=%s", user.pk, method, len(codes or ()))
-
-
 def enable_email(user, code):
     """Turns on email codes once a code sent to the account email comes back, which also
-    proves the address. Returns (result, recovery_codes or None)."""
+    proves the address. Returns (result, recovery_codes)."""
     with transaction.atomic():
         fresh = User.objects.select_for_update().get(pk=user.pk)
         if fresh.email_two_factor:
@@ -177,69 +141,23 @@ def enable_email(user, code):
         result, _ = email_codes.check(user, email_codes.SECURITY, code)
         if result != OK:
             return result, None
-        # Recovery codes come with the first method, so failed email delivery never locks anyone out.
-        first = not fresh.totp_enabled
         User.objects.filter(pk=user.pk).update(email_two_factor=True)
-        codes = _issue_recovery_codes(user) if first else None
-    _enabled(user, EMAIL, codes)
+        # Recovery codes, so failed email delivery never locks anyone out.
+        codes = _issue_recovery_codes(user)
+    log.info("enabled user=%s method=email recovery_codes=%s", user.pk, len(codes))
     return OK, codes
 
 
-def start_setup(user):
-    """Creates a fresh unconfirmed authenticator. Returns None if one is already on."""
-    if _fresh(user).totp_enabled:
-        return None
-    secret = pyotp.random_base32()
-    TOTPDevice.objects.update_or_create(user=user, defaults={
-        "secret": secret, "confirmed": False, "last_used_step": None,
-    })
-    uri = pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name=ISSUER)
-    log.info("setup_started user=%s method=totp", user.pk)
-    return {
-        "secret": secret,
-        "otpauth_uri": uri,
-        "qr_code": segno.make(uri, error="m").svg_data_uri(scale=5, border=2),
-    }
-
-
-def confirm_setup(user, code):
-    """Turns on the authenticator once it produces a valid code.
-    Returns (result, recovery_codes or None)."""
-    with transaction.atomic():
-        first = not _fresh(user).two_factor_enabled
-        result = check_code(user, code, method=TOTP, purpose="enable", confirmed=False)
-        if result != OK:
-            return result, None
-        TOTPDevice.objects.filter(user=user).update(confirmed=True)
-        codes = _issue_recovery_codes(user) if first else None
-    _enabled(user, TOTP, codes)
-    return OK, codes
-
-
-def _disable(user, target, method, code):
+def disable_email(user, method, code):
+    """Turns two-step verification off, confirmed by an email or recovery code."""
+    if not _fresh(user).email_two_factor:
+        return INVALID
     with transaction.atomic():
         result = authorize(user, method, code, purpose="disable")
         if result != OK:
             return result
-        if target == EMAIL:
-            User.objects.filter(pk=user.pk).update(email_two_factor=False)
-        else:
-            TOTPDevice.objects.filter(user=user).delete()
-        if not _fresh(user).two_factor_enabled:
-            # With no method left, two-step verification is off and recovery codes go too.
-            RecoveryCode.objects.filter(user=user).delete()
-            email_codes.discard(user, email_codes.SIGN_IN)
-    log.info("disabled user=%s method=%s authorized_by=%s", user.pk, target, method)
+        User.objects.filter(pk=user.pk).update(email_two_factor=False)
+        RecoveryCode.objects.filter(user=user).delete()
+        email_codes.discard(user, email_codes.SIGN_IN)
+    log.info("disabled user=%s method=email authorized_by=%s", user.pk, method)
     return OK
-
-
-def disable_email(user, method, code):
-    if not _fresh(user).email_two_factor:
-        return INVALID
-    return _disable(user, EMAIL, method, code)
-
-
-def disable_totp(user, method, code):
-    if not _fresh(user).totp_enabled:
-        return INVALID
-    return _disable(user, TOTP, method, code)

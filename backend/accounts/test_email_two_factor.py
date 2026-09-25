@@ -4,7 +4,6 @@ import smtplib
 from datetime import timedelta
 from unittest.mock import patch
 
-import pyotp
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase, override_settings
@@ -89,15 +88,6 @@ class EmailTwoFactorTests(TestCase):
             self.sign_out()
         return codes
 
-    def add_authenticator(self):
-        setup = self.post("two-factor-setup").json()
-        self.secrets.update({setup["secret"], setup["otpauth_uri"]})
-        code = pyotp.TOTP(setup["secret"]).at(self.now)
-        self.secrets.add(code)
-        response = self.post("two-factor-enable", {"code": code})
-        self.assertEqual(response.status_code, 200)
-        return setup["secret"], response.json()["recovery_codes"]
-
     # Turning email codes on
 
     def test_turning_on_needs_a_code_from_the_account_email_and_gives_recovery_codes(self):
@@ -114,7 +104,6 @@ class EmailTwoFactorTests(TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertTrue(body["email_two_factor_enabled"] and body["two_factor_enabled"])
-        self.assertFalse(body["totp_enabled"])
         self.assertEqual(len(set(body["recovery_codes"])), 10)
         self.assertEqual(body["recovery_codes_remaining"], 10)
         stored = set(RecoveryCode.objects.filter(user=self.user).values_list("code_hash", flat=True))
@@ -214,32 +203,6 @@ class EmailTwoFactorTests(TestCase):
         self.assertEqual(self.verify("totp", "123456").status_code, 400)
         self.assertEqual(self.post("two-factor-verify", {"code": self.last_code()}).status_code, 400)
 
-    # The authenticator app as an extra method
-
-    def test_authenticator_is_an_extra_method_that_keeps_recovery_codes(self):
-        first = self.enable_email(sign_out=False)
-        secret, codes = self.add_authenticator()
-        self.assertIsNone(codes, "recovery codes come only with the first method")
-        self.assertEqual(RecoveryCode.objects.filter(user=self.user).count(), 10)
-        self.sign_out()
-        body = self.password_login().json()
-        self.assertEqual(body["methods"], ["email", "totp", "recovery"])
-        self.now += timedelta(seconds=30)
-        code = pyotp.TOTP(secret).at(self.now)
-        self.secrets.add(code)
-        self.assertEqual(self.verify("totp", code).status_code, 200)
-        self.assertTrue(first)
-
-    def test_authenticator_first_then_email_keeps_the_first_codes(self):
-        self.password_login()
-        _, codes = self.add_authenticator()
-        self.assertEqual(len(codes), 10)
-        self.secrets.update(codes)
-        self.now += timedelta(seconds=30)
-        self.post("two-factor-email-code")
-        response = self.post("two-factor-email-enable", {"code": self.last_code()})
-        self.assertIsNone(response.json()["recovery_codes"])
-
     # Turning off
 
     def test_turning_off_with_an_email_code_ends_two_step_verification(self):
@@ -270,19 +233,6 @@ class EmailTwoFactorTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"], "Request a new code first.")
         self.assertTrue(User.objects.get(pk=self.user.pk).email_two_factor)
-
-    def test_removing_the_authenticator_keeps_email_codes_and_recovery_codes(self):
-        self.enable_email(sign_out=False)
-        secret, _ = self.add_authenticator()
-        self.now += timedelta(seconds=30)
-        code = pyotp.TOTP(secret).at(self.now)
-        self.secrets.add(code)
-        response = self.post("two-factor-disable", {"method": "totp", "code": code})
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertFalse(body["totp_enabled"])
-        self.assertTrue(body["two_factor_enabled"])
-        self.assertEqual(body["recovery_codes_remaining"], 10)
 
     # Logging
 

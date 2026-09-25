@@ -1,14 +1,14 @@
 import logging
+import re
 from unittest.mock import patch
 
-import pyotp
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from google.auth import exceptions as google_exceptions
 from rest_framework.test import APIClient
 
-from .models import TOTPDevice
 from .test_university import Capture
 
 User = get_user_model()
@@ -118,16 +118,15 @@ class GoogleSignInTests(TestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_google_sign_in_still_requires_second_factor(self):
-        secret = pyotp.random_base32()
-        User.objects.filter(pk=self.user.pk).update(google_subject="google-123")
-        TOTPDevice.objects.create(user=self.user, secret=secret, confirmed=True)
+        User.objects.filter(pk=self.user.pk).update(google_subject="google-123", email_two_factor=True)
         response = self.google()
         self.assertTrue(response.json()["two_factor_required"])
-        self.assertEqual(response.json()["methods"], ["totp"])
+        self.assertEqual(response.json()["methods"], ["email"])
         self.assertNotIn("_auth_user_id", self.client.session)
         self.token = response.json()["csrf_token"]
+        code = re.search(r"\b(\d{6})\b", mail.outbox[-1].body).group(1)
         verified = self.client.post(
-            reverse("two-factor-verify"), {"method": "totp", "code": pyotp.TOTP(secret).now()},
+            reverse("two-factor-verify"), {"method": "email", "code": code},
             format="json", HTTP_X_CSRFTOKEN=self.token,
         )
         self.assertEqual(verified.status_code, 200)

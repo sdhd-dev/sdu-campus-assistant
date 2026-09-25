@@ -40,10 +40,9 @@ class User(AbstractUser):
         max_length=16, choices=AffiliationSource.choices, null=True, blank=True,
     )
 
-    # Two-step verification by a code sent to the account email. The authenticator app
-    # (TOTPDevice) is an optional extra method; either one turns two-step verification on.
+    # Two-step verification by a code sent to the account email.
     email_two_factor = models.BooleanField(default=False)
-    # One lockout for authenticator and recovery codes; email codes burn on their own.
+    # Lockout for recovery codes; email codes burn on their own.
     two_factor_failed_attempts = models.PositiveSmallIntegerField(default=0)
     two_factor_locked_until = models.DateTimeField(null=True, blank=True)
 
@@ -91,29 +90,13 @@ class User(AbstractUser):
         return bool(self.google_subject)
 
     @property
-    def totp_enabled(self):
-        device = getattr(self, "totp_device", None)
-        return bool(device and device.confirmed)
-
-    @property
     def two_factor_enabled(self):
-        return self.email_two_factor or self.totp_enabled
-
-
-class TOTPDevice(models.Model):
-    """An optional authenticator app. Unconfirmed until the user proves it with one code."""
-
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="totp_device")
-    secret = models.CharField(max_length=64)
-    confirmed = models.BooleanField(default=False)
-    # The last accepted 30-second step; a code is never accepted twice.
-    last_used_step = models.BigIntegerField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+        return self.email_two_factor
 
 
 class RecoveryCode(models.Model):
-    """A single-use fallback when email or the authenticator is out of reach. Issued when
-    the first two-step method is turned on. Only a SHA-256 digest is stored."""
+    """A single-use fallback when an email code can't be received. Issued when two-step
+    verification is turned on. Only a SHA-256 digest is stored."""
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recovery_codes")
     code_hash = models.CharField(max_length=64)

@@ -26,7 +26,7 @@ PENDING_2FA = "two_factor_pending"
 # As long as an emailed code lives, so a slow email still arrives in time.
 PENDING_2FA_SECONDS = 600
 GOOGLE_NONCE = "google_nonce"
-INVALID_CODE = {"detail": "That code isn’t valid. Check your authenticator app and try again."}
+INVALID_CODE = {"detail": "That code isn’t valid. Please check it and try again."}
 EMAIL_INVALID_CODE = {"detail": "That code isn’t valid. Check the email and try again."}
 RECOVERY_INVALID_CODE = {"detail": "That recovery code isn’t valid or was already used."}
 LOCKED_CODE = {"detail": "Too many incorrect codes. Wait a few minutes and try again."}
@@ -144,7 +144,7 @@ def method_code_from(request):
     if not isinstance(request.data, dict) or set(request.data) != {"method", "code"}:
         return None, None
     method, code = request.data["method"], request.data["code"]
-    if (method not in (two_factor.EMAIL, two_factor.TOTP, two_factor.RECOVERY)
+    if (method not in (two_factor.EMAIL, two_factor.RECOVERY)
             or not isinstance(code, str) or len(code) > 32):
         return None, None
     return method, code
@@ -160,7 +160,7 @@ def code_refusal(result, method):
         }.get(result, Response(EMAIL_INVALID_CODE, status=400))
     if result == two_factor.LOCKED:
         return Response(LOCKED_CODE, status=429)
-    return Response(RECOVERY_INVALID_CODE if method == two_factor.RECOVERY else INVALID_CODE, status=400)
+    return Response(RECOVERY_INVALID_CODE, status=400)
 
 
 def pending_sign_in_user(request):
@@ -295,7 +295,6 @@ def security_state(request, user, status=200, **extra):
         "has_password": user.has_usable_password(),
         "two_factor_enabled": user.two_factor_enabled,
         "email_two_factor_enabled": user.email_two_factor,
-        "totp_enabled": user.totp_enabled,
         "recovery_codes_remaining": (
             two_factor.recovery_codes_remaining(user) if user.two_factor_enabled else 0
         ),
@@ -424,53 +423,6 @@ def two_factor_email_disable(request, user):
     if method is None:
         return Response(INVALID_CODE, status=400)
     result = two_factor.disable_email(user, method, code)
-    if result != two_factor.OK:
-        return code_refusal(result, method)
-    return security_state(request, user)
-
-
-@never_cache
-@api_view(["POST"])
-@authentication_classes([CSRFAuthentication])
-@permission_classes([AllowAny])
-@signed_in
-def two_factor_setup(request, user):
-    if request.data:
-        return Response({"detail": "No fields are accepted."}, status=400)
-    setup = two_factor.start_setup(user)
-    if setup is None:
-        return Response({"detail": "The authenticator app is already on."}, status=409)
-    return Response({**setup, "csrf_token": get_token(request)})
-
-
-@never_cache
-@api_view(["POST"])
-@authentication_classes([CSRFAuthentication])
-@permission_classes([AllowAny])
-@signed_in
-@sensitive_variables()
-def two_factor_enable(request, user):
-    code = code_from(request)
-    if code is None:
-        return Response(INVALID_CODE, status=400)
-    result, codes = two_factor.confirm_setup(user, code)
-    if result != two_factor.OK:
-        return code_refusal(result, two_factor.TOTP)
-    # Recovery codes come only with the first method; otherwise the existing ones stay.
-    return security_state(request, user, recovery_codes=codes)
-
-
-@never_cache
-@api_view(["POST"])
-@authentication_classes([CSRFAuthentication])
-@permission_classes([AllowAny])
-@signed_in
-@sensitive_variables()
-def two_factor_disable(request, user):
-    method, code = method_code_from(request)
-    if method is None:
-        return Response(INVALID_CODE, status=400)
-    result = two_factor.disable_totp(user, method, code)
     if result != two_factor.OK:
         return code_refusal(result, method)
     return security_state(request, user)

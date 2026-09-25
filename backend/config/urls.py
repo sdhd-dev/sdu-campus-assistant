@@ -2,8 +2,8 @@ from django.urls import path
 
 from accounts.views import (
     current_user, google_link, google_sign_in, login, logout, profile, register, security,
-    two_factor_disable, two_factor_email_code, two_factor_email_disable, two_factor_email_enable,
-    two_factor_enable, two_factor_resend, two_factor_setup, two_factor_verify, verification,
+    two_factor_email_code, two_factor_email_disable, two_factor_email_enable, two_factor_resend,
+    two_factor_verify, verification,
     verification_cancel, verification_confirm, verification_start,
 )
 from core.views import health
@@ -24,9 +24,6 @@ urlpatterns = [
          name="two-factor-email-enable"),
     path("api/auth/security/two-factor/email/disable/", two_factor_email_disable,
          name="two-factor-email-disable"),
-    path("api/auth/security/two-factor/setup/", two_factor_setup, name="two-factor-setup"),
-    path("api/auth/security/two-factor/enable/", two_factor_enable, name="two-factor-enable"),
-    path("api/auth/security/two-factor/disable/", two_factor_disable, name="two-factor-disable"),
     path("api/profile/", profile, name="profile"),
     path("api/profile/verification/", verification, name="verification"),
     path("api/profile/verification/start/", verification_start, name="verification-start"),
