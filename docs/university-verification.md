@@ -36,7 +36,9 @@ All values go in `.env` (development) or the process environment (production).
 Domain rules:
 - Domains are matched exactly and ignore case. `sdu.edu.kz` does not match
   `x.sdu.edu.kz`, and a leading `@` is ignored.
-- A domain listed as both Student and Staff stops the server from starting.
+- A domain may be listed as both Student and Staff (since
+  [US-10](shared-university-domain.md)); it then proves SDU membership, and the
+  user chooses the role.
 - With both lists empty, the section is hidden and the API returns 404.
 
 In production, configured domains also require the SMTP backend and non-empty

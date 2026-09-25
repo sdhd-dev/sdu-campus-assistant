@@ -1,5 +1,10 @@
 # US-07: Student and Staff only after verification
 
+> Since [US-10](shared-university-domain.md), one domain may serve both roles. SDU
+> uses `sdu.edu.kz` for everyone, so the code proves SDU membership and the user's
+> chosen role is granted. The "domain must match the role" rule below applies only
+> when student and staff domains differ.
+
 Every account starts as **Visitor**. Choosing **Student** or **Staff** in the
 profile opens **Verify your role**: enter an SDU email, choose **Send code**,
 enter the code, then choose **Verify**. The role changes only when the server

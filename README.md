@@ -172,6 +172,9 @@ Since US-07, choosing **Student** or **Staff** opens **Verify your role**, and t
 role changes only after a correct code from a matching SDU domain; **Visitor** is
 always available. Existing unverified Student/Staff accounts were reset to Visitor.
 See the [US-07 guide](docs/verified-roles.md).
+SDU uses one domain, `sdu.edu.kz`, for students and staff: list it as both the
+student and the staff domain, and the chosen role is granted after the code (see
+[US-10](docs/shared-university-domain.md)).
 
 Since US-08, **Two-step verification** sends a 6-digit code to the account email
 at every sign-in (password or Google), with recovery codes as the fallback. The
@@ -226,7 +229,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 118 backend tests pass (`accounts` and `core`). Quick manual pass:
+All 123 backend tests pass (`accounts` and `core`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 
