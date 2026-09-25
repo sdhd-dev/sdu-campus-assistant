@@ -5,7 +5,8 @@ services, and student schedules. **US-01 provides the project and database
 foundation; US-02 adds email registration; US-03 adds session-based email login
 and logout; US-04 adds profile type selection; US-05 adds Continue with Google and optional
 two-step verification; US-06 adds Student/Staff status verification by university
-email code; US-07 makes Student and Staff selectable only after that verification.** Campus features are not
+email code; US-07 makes Student and Staff selectable only after that verification;
+US-08 makes an email code the main two-step verification method.** Campus features are not
 implemented. Registration does not sign users in automatically. This is a first
 working version of Sprint 1, not a production-ready release.
 
@@ -171,6 +172,11 @@ role changes only after a correct code from a matching SDU domain; **Visitor** i
 always available. Existing unverified Student/Staff accounts were reset to Visitor.
 See the [US-07 guide](docs/verified-roles.md).
 
+Since US-08, **Two-step verification** sends a 6-digit code to the account email
+at every sign-in (password or Google). The authenticator app is an optional extra,
+and recovery codes come with the first method turned on. See the
+[US-08 guide](docs/email-two-factor.md).
+
 Behind the account screens is a single photograph of the SDU main entrance,
 loaded once and never reloaded. Login, registration, and the profile are three
 crops of that one picture, and the crop moves smoothly between them. These are
@@ -219,7 +225,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 109 backend tests pass (`accounts` and `core`). Quick manual pass:
+All 126 backend tests pass (`accounts` and `core`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 

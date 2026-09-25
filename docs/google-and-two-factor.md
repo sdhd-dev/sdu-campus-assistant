@@ -1,5 +1,10 @@
 # US-05: Continue with Google and optional two-step verification
 
+> Since [US-08](email-two-factor.md), the main two-step method is a code sent to
+> the account email, and the authenticator app below is an optional extra. The
+> second step and the app's disable endpoint take `{method, code}`, recovery
+> codes come with the first method, and the lockout lives on the user.
+
 Email and password registration and login are unchanged. Sign-in adds a
 **Continue with Google** button under the password form, and the profile gains a
 **Sign-in and security** section where a user can connect or disconnect Google
@@ -18,9 +23,13 @@ and the Google endpoints refuse requests with 404. To enable it:
 
 1. In Google Cloud Console → **Credentials**, create an **OAuth client ID** of type
    **Web application**.
-2. Add `http://127.0.0.1:5173` and `http://localhost:5173` as **Authorized
-   JavaScript origins**. No redirect URI is needed: the button uses popup mode.
-3. Set `GOOGLE_OAUTH_CLIENT_ID=<client id>` in `.env` and restart Django.
+2. Add `http://localhost` and `http://localhost:5173` as **Authorized JavaScript
+   origins**, and open the app at `http://localhost:5173`. Google may refuse
+   `127.0.0.1`. For production, add `https://<your-domain>`. No redirect URI is
+   needed: the button uses popup mode.
+3. While the OAuth consent screen is in **Testing**, add each Google account that
+   will sign in under **Test users**.
+4. Set `GOOGLE_OAUTH_CLIENT_ID=<client id>` in `.env` and restart Django.
 
 No client secret is used or stored.
 
@@ -107,7 +116,6 @@ a real Google sign-in needs a configured client ID and has not been run end to e
    connected and no **Disconnect** button.
 3. Sign in with a password account whose email equals your Google email; confirm
    the 409 message, then connect Google from the profile and sign in with Google.
-4. **Two-step verification → Turn on**, scan the QR code, enter the code, save the
-   recovery codes. Sign out and in: confirm the code step, a wrong code error,
-   and a recovery code working once.
-5. **Turn off…** with a current code; confirm sign-in no longer asks for one.
+4–5. Replaced by the [US-08 checklist](email-two-factor.md#manual-checklist):
+   two-step verification is turned on by email code, and the authenticator app is
+   set up separately.
