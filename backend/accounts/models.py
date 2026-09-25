@@ -28,7 +28,9 @@ class User(AbstractUser):
         # Reserved: a verified Google Workspace "hd" claim on a university domain.
         GOOGLE_WORKSPACE = "GOOGLE_WORKSPACE", "Google Workspace"
 
-    # Proven status, kept apart from the self-selected profile_type. Grants no permissions.
+    # Proven status. profile_type may be Student or Staff only when it matches this.
+    # A verified user may still choose Visitor, and return without verifying again.
+    # Grants no permissions.
     verified_affiliation = models.CharField(
         max_length=7, choices=VerifiedAffiliation.choices, null=True, blank=True,
     )
@@ -64,6 +66,13 @@ class User(AbstractUser):
                     affiliation_source__in=["EMAIL", "GOOGLE_WORKSPACE"],
                 ),
                 name="accounts_user_verified_affiliation_consistent",
+            ),
+            # Student and Staff must be proven; Visitor is always allowed.
+            models.CheckConstraint(
+                condition=models.Q(profile_type="VISITOR")
+                # IS NOT NULL matters: a comparison with NULL would let the check pass.
+                | models.Q(verified_affiliation__isnull=False, profile_type=models.F("verified_affiliation")),
+                name="accounts_user_role_requires_verification",
             ),
         ]
 
