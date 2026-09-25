@@ -28,11 +28,9 @@ class Capture(logging.Handler):
         self.messages.append(record.getMessage())
 
 
-@override_settings(
-    UNIVERSITY_STUDENT_DOMAINS=frozenset({"stu.sdu.edu.kz"}),
-    UNIVERSITY_STAFF_DOMAINS=frozenset({"sdu.edu.kz"}),
-)
-class UniversityEmailTests(TestCase):
+class UniversityEmailBase(TestCase):
+    """Accounts, a fixed clock, and log capture shared by the verification tests."""
+
     @classmethod
     def setUpTestData(cls):
         cls.password = "Pine-forest!47-trail"
@@ -86,6 +84,15 @@ class UniversityEmailTests(TestCase):
     def logged(self, event):
         return [message for message in self.capture.messages if message.startswith(event)]
 
+
+
+@override_settings(
+    UNIVERSITY_STUDENT_DOMAINS=frozenset({"stu.sdu.edu.kz"}),
+    UNIVERSITY_STAFF_DOMAINS=frozenset({"sdu.edu.kz"}),
+)
+class UniversityEmailTests(UniversityEmailBase):
+    """Separate student and staff domains: the domain proves the role."""
+
     # Availability and access
 
     @override_settings(UNIVERSITY_STUDENT_DOMAINS=frozenset(), UNIVERSITY_STAFF_DOMAINS=frozenset())
@@ -103,7 +110,7 @@ class UniversityEmailTests(TestCase):
     def test_state_shape(self):
         body = self.client.get(reverse("verification")).json()
         self.assertEqual(set(body), {
-            "profile_type", "verified_affiliation", "university_email", "verified_at", "pending_email",
+            "profile_type", "verified_affiliation", "university_email", "pending_role", "verified_at", "pending_email",
             "resend_in", "student_domains", "staff_domains", "csrf_token",
         })
         self.assertIsNone(body["verified_affiliation"])
@@ -324,3 +331,48 @@ class UniversityEmailTests(TestCase):
                   "nonce": "n", "hd": "stu.sdu.edu.kz"}
         with patch("accounts.google.id_token.verify_oauth2_token", return_value=claims):
             self.assertEqual(google.verify_credential("token", "n")["hosted_domain"], "stu.sdu.edu.kz")
+
+
+@override_settings(
+    UNIVERSITY_STUDENT_DOMAINS=frozenset({"sdu.edu.kz"}),
+    UNIVERSITY_STAFF_DOMAINS=frozenset({"sdu.edu.kz"}),
+)
+class SharedUniversityDomainTests(UniversityEmailBase):
+    """One domain for everyone, as at SDU: the code proves the address, the user picks the role."""
+
+    def test_either_role_can_be_verified_with_the_same_domain(self):
+        for role in ("STUDENT", "STAFF"):
+            with self.subTest(role=role):
+                self.now += timedelta(seconds=61)
+                response = self.start(STAFF_EMAIL, role=role)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["pending_role"], role)
+                body = self.confirm(self.last_code()).json()
+                self.assertEqual((body["verified_affiliation"], body["profile_type"]), (role, role))
+                self.assertIsNone(body["pending_role"])
+
+    def test_the_role_granted_is_the_one_requested_with_the_latest_code(self):
+        self.start(STAFF_EMAIL, role="STAFF")
+        self.now += timedelta(seconds=61)
+        self.start(STAFF_EMAIL, role="STUDENT")
+        body = self.confirm(self.last_code()).json()
+        self.assertEqual(body["verified_affiliation"], "STUDENT")
+
+    def test_a_code_without_a_requested_role_is_refused(self):
+        self.start(STAFF_EMAIL, role="STAFF")
+        session = self.client.session
+        del session["role_verification"]
+        session.save()
+        response = self.confirm(self.last_code())
+        self.assertEqual(response.status_code, 400)
+        self.assertIsNone(User.objects.get(pk=self.user.pk).verified_affiliation)
+
+    def test_other_domains_are_still_refused(self):
+        for email in ("x@gmail.com", "x@stu.sdu.edu.kz"):
+            with self.subTest(email=email):
+                self.assertEqual(self.start(email, role="STUDENT").status_code, 400)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_a_shared_domain_cannot_set_the_role_by_itself(self):
+        self.assertIsNone(university.affiliation_for_domain("sdu.edu.kz"))
+        self.assertEqual(university.roles_for_domain("SDU.EDU.KZ"), ["STUDENT", "STAFF"])

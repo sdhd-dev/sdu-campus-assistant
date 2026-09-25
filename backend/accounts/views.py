@@ -496,32 +496,41 @@ UNIVERSITY_RESULTS = {
 UNIVERSITY_UNAVAILABLE = {"detail": "Verification is temporarily unavailable. Please try again."}
 
 
+# The role asked for when the code was sent; confirm grants exactly this role.
+ROLE_REQUEST = "role_verification"
+
+
 def verification_state(request, user, status=200, **extra):
+    state = university.state(user)
     return Response({
-        **university.state(user), "csrf_token": get_token(request), **extra,
+        **state,
+        "pending_role": request.session.get(ROLE_REQUEST) if state["pending_email"] else None,
+        "csrf_token": get_token(request), **extra,
     }, status=status)
 
 
 def role_request_from(request):
-    """Returns (email, role) for an address whose domain proves the role, or (None, error)."""
+    """Returns (email, role, None) for an address whose domain can prove the role,
+    or (None, None, error)."""
     if (not isinstance(request.data, dict) or set(request.data) != {"email", "role"}
             or request.data["role"] not in User.VerifiedAffiliation.values):
-        return None, UNIVERSITY_ROLE
+        return None, None, UNIVERSITY_ROLE
     email = request.data["email"]
     if not isinstance(email, str) or len(email) > 254:
-        return None, UNIVERSITY_ONLY
+        return None, None, UNIVERSITY_ONLY
     email = User.objects.normalize_email(email.strip()).lower()
     try:
         validate_email(email)
     except ValidationError:
-        return None, UNIVERSITY_ONLY
-    affiliation = university.affiliation_for_email(email)
-    if affiliation is None:
-        return None, UNIVERSITY_ONLY
-    if affiliation != request.data["role"]:
-        label = User.VerifiedAffiliation(affiliation).label
-        return None, {"detail": f"This is a {label.lower()} address. Choose {label} to verify it."}
-    return email, None
+        return None, None, UNIVERSITY_ONLY
+    roles = university.roles_for_email(email)
+    if not roles:
+        return None, None, UNIVERSITY_ONLY
+    role = request.data["role"]
+    if role not in roles:
+        label = User.VerifiedAffiliation(roles[0]).label
+        return None, None, {"detail": f"This is a {label.lower()} address. Choose {label} to verify it."}
+    return email, role, None
 
 
 def university_request(view):
@@ -547,6 +556,7 @@ def university_request(view):
 def verification(request, user):
     if request.method == "DELETE":
         university.remove(user)
+        request.session.pop(ROLE_REQUEST, None)
     return verification_state(request, user)
 
 
@@ -556,7 +566,7 @@ def verification(request, user):
 @permission_classes([AllowAny])
 @university_request
 def verification_start(request, user):
-    email, error = role_request_from(request)
+    email, role, error = role_request_from(request)
     if error:
         return Response(error, status=400)
     result, retry_after = university.start(user, email)
@@ -565,6 +575,8 @@ def verification_start(request, user):
             request, user, status=429, retry_after=retry_after,
             detail="Please wait before requesting another code.",
         )
+    # A new code replaces the old one, and so does the role it will grant.
+    request.session[ROLE_REQUEST] = role
     return verification_state(request, user, detail=UNIVERSITY_SENT)
 
 
@@ -576,10 +588,12 @@ def verification_start(request, user):
 @sensitive_variables()
 def verification_confirm(request, user):
     code = code_from(request)
-    result = university.confirm(user, code) if code is not None else university.INVALID
+    role = request.session.get(ROLE_REQUEST)
+    result = university.confirm(user, code, role) if code is not None else university.INVALID
     if result != university.OK:
         status, detail = UNIVERSITY_RESULTS[result]
         return verification_state(request, user, status=status, detail=detail)
+    request.session.pop(ROLE_REQUEST, None)
     return verification_state(request, user)
 
 
@@ -590,4 +604,5 @@ def verification_confirm(request, user):
 @university_request
 def verification_cancel(request, user):
     university.cancel(user)
+    request.session.pop(ROLE_REQUEST, None)
     return verification_state(request, user)

@@ -27,19 +27,28 @@ def enabled():
     return bool(settings.UNIVERSITY_STUDENT_DOMAINS or settings.UNIVERSITY_STAFF_DOMAINS)
 
 
-def affiliation_for_domain(domain):
-    """Maps an exact university domain to a status. Also the entry point for a future
-    Google Workspace path, where the domain would come from a verified "hd" claim."""
+def roles_for_domain(domain):
+    """The roles an exact university domain can prove. A domain listed for both roles
+    (SDU uses one domain for everyone) proves membership, and the user chooses the role."""
     domain = (domain or "").lower()
-    if domain in settings.UNIVERSITY_STUDENT_DOMAINS:
-        return User.VerifiedAffiliation.STUDENT
-    if domain in settings.UNIVERSITY_STAFF_DOMAINS:
-        return User.VerifiedAffiliation.STAFF
-    return None
+    return [
+        role for role, domains in (
+            (User.VerifiedAffiliation.STUDENT, settings.UNIVERSITY_STUDENT_DOMAINS),
+            (User.VerifiedAffiliation.STAFF, settings.UNIVERSITY_STAFF_DOMAINS),
+        ) if domain in domains
+    ]
 
 
-def affiliation_for_email(email):
-    return affiliation_for_domain(email.rpartition("@")[2])
+def roles_for_email(email):
+    return roles_for_domain(email.rpartition("@")[2])
+
+
+def affiliation_for_domain(domain):
+    """The one role a domain proves on its own, or None when it proves none or both.
+    Entry point for a future Google Workspace path (a verified "hd" claim); a shared
+    domain cannot set the role automatically."""
+    roles = roles_for_domain(domain)
+    return roles[0] if len(roles) == 1 else None
 
 
 def start(user, email):
@@ -55,20 +64,24 @@ def start(user, email):
     )
 
 
-def confirm(user, code):
+def confirm(user, code, role):
     """Checks the pending code and, if it matches, records the verified status and makes it
-    the user's role."""
+    the user's role. role is the one requested when the code was sent."""
     now = timezone.now()
     with transaction.atomic():
         result, email = email_codes.check(user, email_codes.ROLE, code)
         if result != OK:
             return result
+        if role is None:
+            log.info("verification_refused user=%s email=%s reason=no_requested_role",
+                     user.pk, mask(email))
+            return NO_CODE
         # Settings may have changed since the code was sent.
-        affiliation = affiliation_for_email(email)
-        if affiliation is None:
+        if role not in roles_for_email(email):
             log.info("verification_refused user=%s email=%s reason=not_university_domain",
                      user.pk, mask(email))
             return NOT_UNIVERSITY
+        affiliation = role
         try:
             # The unique constraint is the final word if two accounts confirm at once.
             with transaction.atomic():
