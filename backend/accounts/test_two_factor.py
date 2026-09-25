@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -48,6 +49,11 @@ class TwoFactorTests(TestCase):
         return (client or self.client).post(
             reverse(name), payload or {}, format="json", HTTP_X_CSRFTOKEN=token or self.token,
         )
+
+    def verify(self, code, client=None):
+        """The second sign-in step; the method follows from the code's shape."""
+        method = "totp" if re.fullmatch(r"\d{6}", code.strip()) else "recovery"
+        return self.post("two-factor-verify", {"method": method, "code": code}, client)
 
     def password_login(self, client=None):
         client = client or self.client
@@ -121,7 +127,7 @@ class TwoFactorTests(TestCase):
     def test_setup_is_refused_while_enabled(self):
         self.enable()
         self.password_login()
-        self.post("two-factor-verify", {"code": "000000"})
+        self.verify("000000")
         # Still pending, so the session is anonymous.
         self.assertEqual(self.post("two-factor-setup").status_code, 401)
 
@@ -135,12 +141,16 @@ class TwoFactorTests(TestCase):
         secret, _ = self.enable()
         response = self.password_login()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(set(response.json()), {"two_factor_required", "csrf_token"})
+        self.assertEqual(set(response.json()), {
+            "two_factor_required", "methods", "email_hint", "email_code_sent", "resend_in", "csrf_token",
+        })
+        self.assertEqual(response.json()["methods"], ["totp", "recovery"])
+        self.assertFalse(response.json()["email_code_sent"])
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertEqual(self.client.get(reverse("current-user")).status_code, 401)
         self.assertEqual(self.client.get(reverse("profile")).status_code, 401)
 
-        verified = self.post("two-factor-verify", {"code": self.code(secret)})
+        verified = self.verify(self.code(secret))
         self.assertEqual(verified.status_code, 200)
         self.assertEqual(set(verified.json()), {"email", "csrf_token"})
         self.assertEqual(self.client.session["_auth_user_id"], str(self.user.pk))
@@ -149,7 +159,7 @@ class TwoFactorTests(TestCase):
     def test_verify_without_pending_sign_in_is_refused(self):
         secret, _ = self.enable()
         self.token = self.client.get(reverse("login")).json()["csrf_token"]
-        response = self.post("two-factor-verify", {"code": self.code(secret)})
+        response = self.verify(self.code(secret))
         self.assertEqual(response.status_code, 401)
         self.assertNotIn("_auth_user_id", self.client.session)
 
@@ -157,9 +167,9 @@ class TwoFactorTests(TestCase):
         secret, _ = self.enable()
         self.password_login()
         session = self.client.session
-        session["two_factor_pending"]["expires"] -= 301
+        session["two_factor_pending"]["expires"] -= 601
         session.save()
-        response = self.post("two-factor-verify", {"code": self.code(secret)})
+        response = self.verify(self.code(secret))
         self.assertEqual(response.status_code, 401)
         self.assertNotIn("_auth_user_id", self.client.session)
 
@@ -167,26 +177,26 @@ class TwoFactorTests(TestCase):
         secret, _ = self.enable()
         code = self.code(secret)
         self.password_login()
-        self.assertEqual(self.post("two-factor-verify", {"code": code}).status_code, 200)
+        self.assertEqual(self.verify(code).status_code, 200)
         other = APIClient(enforce_csrf_checks=True)
         self.password_login(other)
-        self.assertEqual(self.post("two-factor-verify", {"code": code}, other).status_code, 400)
+        self.assertEqual(self.verify(code, other).status_code, 400)
 
     def test_adjacent_step_is_accepted_for_clock_drift(self):
         secret, _ = self.enable()
         self.password_login()
-        self.assertEqual(self.post("two-factor-verify", {"code": self.code(secret, 30)}).status_code, 200)
+        self.assertEqual(self.verify(self.code(secret, 30)).status_code, 200)
 
     def test_recovery_code_works_once_in_any_format(self):
         _, codes = self.enable()
         self.password_login()
-        response = self.post("two-factor-verify", {"code": f"  {codes[0].upper().replace('-', ' ')} "})
+        response = self.verify(f"  {codes[0].upper().replace('-', ' ')} ")
         self.assertEqual(response.status_code, 200)
         self.post("logout")
         self.client = APIClient(enforce_csrf_checks=True)
         self.password_login()
-        self.assertEqual(self.post("two-factor-verify", {"code": codes[0]}).status_code, 400)
-        self.assertEqual(self.post("two-factor-verify", {"code": codes[1]}).status_code, 200)
+        self.assertEqual(self.verify(codes[0]).status_code, 400)
+        self.assertEqual(self.verify(codes[1]).status_code, 200)
         self.assertEqual(self.client.get(reverse("security")).json()["recovery_codes_remaining"], 8)
 
     def test_repeated_wrong_codes_lock_the_second_step(self):
@@ -194,18 +204,18 @@ class TwoFactorTests(TestCase):
         self.password_login()
         wrong = "000000" if self.code(secret) != "000000" else "111111"
         for _ in range(5):
-            self.assertEqual(self.post("two-factor-verify", {"code": wrong}).status_code, 400)
+            self.assertEqual(self.verify(wrong).status_code, 400)
         # Even the right code is refused during the lockout, from any new sign-in.
         self.password_login()
-        self.assertEqual(self.post("two-factor-verify", {"code": self.code(secret)}).status_code, 429)
+        self.assertEqual(self.verify(self.code(secret)).status_code, 429)
         self.now += timedelta(minutes=6)
-        self.assertEqual(self.post("two-factor-verify", {"code": self.code(secret)}).status_code, 200)
+        self.assertEqual(self.verify(self.code(secret)).status_code, 200)
 
     def test_inactive_user_cannot_finish_pending_sign_in(self):
         secret, _ = self.enable()
         self.password_login()
         User.objects.filter(pk=self.user.pk).update(is_active=False)
-        self.assertEqual(self.post("two-factor-verify", {"code": self.code(secret)}).status_code, 401)
+        self.assertEqual(self.verify(self.code(secret)).status_code, 401)
         self.assertNotIn("_auth_user_id", self.client.session)
 
     # Disabling
@@ -213,11 +223,11 @@ class TwoFactorTests(TestCase):
     def test_disable_requires_a_valid_code(self):
         secret, _ = self.enable()
         self.password_login()
-        self.token = self.post("two-factor-verify", {"code": self.code(secret)}).json()["csrf_token"]
+        self.token = self.verify(self.code(secret)).json()["csrf_token"]
         self.now += timedelta(seconds=30)
-        self.assertEqual(self.post("two-factor-disable", {"code": "12345"}).status_code, 400)
+        self.assertEqual(self.post("two-factor-disable", {"method": "totp", "code": "12345"}).status_code, 400)
         self.assertTrue(TOTPDevice.objects.filter(user=self.user).exists())
-        response = self.post("two-factor-disable", {"code": self.code(secret)})
+        response = self.post("two-factor-disable", {"method": "totp", "code": self.code(secret)})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["two_factor_enabled"])
         self.assertFalse(TOTPDevice.objects.filter(user=self.user).exists())
@@ -231,7 +241,8 @@ class TwoFactorTests(TestCase):
         body = self.client.get(reverse("security")).json()
         self.assertEqual(set(body), {
             "google_available", "google_linked", "has_password", "two_factor_enabled",
-            "recovery_codes_remaining", "csrf_token",
+            "email_two_factor_enabled", "totp_enabled", "recovery_codes_remaining", "email",
+            "email_code_pending", "email_resend_in", "csrf_token",
         })
         self.assertTrue(body["has_password"])
 
@@ -244,14 +255,14 @@ class TwoFactorTests(TestCase):
         wrong = "000000" if self.code(secret) != "000000" else "111111"
 
         self.password_login()
-        self.post("two-factor-verify", {"code": wrong})
-        self.token = self.post("two-factor-verify", {"code": f" {codes[0]} "}).json()["csrf_token"]
+        self.verify(wrong)
+        self.token = self.verify(f" {codes[0]} ").json()["csrf_token"]
         self.assertEqual(self.events()[3:], ["code_invalid", "recovery_code_used"])
-        self.assertIn("purpose=sign_in attempts=1", self.capture.messages[3])
+        self.assertIn("purpose=sign_in method=totp attempts=1", self.capture.messages[3])
         self.assertIn("remaining=9", self.capture.messages[4])
 
         self.now += timedelta(seconds=30)
-        self.post("two-factor-disable", {"code": self.code(secret)})
+        self.post("two-factor-disable", {"method": "totp", "code": self.code(secret)})
         self.assertEqual(self.events()[5:], ["code_accepted", "disabled"])
         self.assertIn("purpose=disable", self.capture.messages[5])
 
@@ -260,7 +271,7 @@ class TwoFactorTests(TestCase):
         self.password_login()
         wrong = "000000" if self.code(secret) != "000000" else "111111"
         for _ in range(5):
-            self.post("two-factor-verify", {"code": wrong})
-        self.post("two-factor-verify", {"code": self.code(secret)})
+            self.verify(wrong)
+        self.verify(self.code(secret))
         self.assertEqual(self.events()[3:], ["code_invalid"] * 5 + ["locked", "code_refused_locked"])
         self.assertIn("attempts=5", self.capture.messages[7])

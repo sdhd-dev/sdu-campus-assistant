@@ -122,11 +122,12 @@ class GoogleSignInTests(TestCase):
         User.objects.filter(pk=self.user.pk).update(google_subject="google-123")
         TOTPDevice.objects.create(user=self.user, secret=secret, confirmed=True)
         response = self.google()
-        self.assertEqual(set(response.json()), {"two_factor_required", "csrf_token"})
+        self.assertTrue(response.json()["two_factor_required"])
+        self.assertEqual(response.json()["methods"], ["totp"])
         self.assertNotIn("_auth_user_id", self.client.session)
         self.token = response.json()["csrf_token"]
         verified = self.client.post(
-            reverse("two-factor-verify"), {"code": pyotp.TOTP(secret).now()},
+            reverse("two-factor-verify"), {"method": "totp", "code": pyotp.TOTP(secret).now()},
             format="json", HTTP_X_CSRFTOKEN=self.token,
         )
         self.assertEqual(verified.status_code, 200)

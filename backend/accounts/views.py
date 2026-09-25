@@ -17,16 +17,25 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from . import google, two_factor, university
+from . import email_codes, google, two_factor, university
 from .serializers import LoginSerializer, ProfileSerializer, RegistrationSerializer
 
 User = get_user_model()
 UNAUTHENTICATED = {"detail": "Authentication required."}
 PENDING_2FA = "two_factor_pending"
-PENDING_2FA_SECONDS = 300
+# As long as an emailed code lives, so a slow email still arrives in time.
+PENDING_2FA_SECONDS = 600
 GOOGLE_NONCE = "google_nonce"
 INVALID_CODE = {"detail": "That code isn’t valid. Check your authenticator app and try again."}
+EMAIL_INVALID_CODE = {"detail": "That code isn’t valid. Check the email and try again."}
+RECOVERY_INVALID_CODE = {"detail": "That recovery code isn’t valid or was already used."}
 LOCKED_CODE = {"detail": "Too many incorrect codes. Wait a few minutes and try again."}
+EMAIL_LOCKED_CODE = {"detail": "Too many incorrect codes. Request a new one."}
+EMAIL_EXPIRED = {"detail": "This code has expired. Request a new one."}
+EMAIL_NO_CODE = {"detail": "Request a new code first."}
+EMAIL_UNAVAILABLE = {"detail": "We couldn’t send the email. Try again, or use another method."}
+SIGN_IN_EXPIRED = {"detail": "Your sign-in expired. Please sign in again."}
+SAVING_UNAVAILABLE = {"detail": "Saving is temporarily unavailable. Please try again."}
 GOOGLE_INVALID = {"detail": "Google sign-in couldn’t be verified. Please try again."}
 GOOGLE_UNAVAILABLE = {"detail": "Google sign-in is temporarily unavailable. Please try again."}
 GOOGLE_DISABLED = {"detail": "Google sign-in isn’t configured for this server."}
@@ -95,12 +104,32 @@ def complete_sign_in(request, user):
         request.session[PENDING_2FA] = {
             "user": user.pk, "expires": int(time.time()) + PENDING_2FA_SECONDS,
         }
-        return Response({"two_factor_required": True, "csrf_token": get_token(request)})
+        methods = two_factor.methods(user)
+        if two_factor.EMAIL in methods:
+            try:
+                # Sent straight away; a rate limit or mail failure still leaves the other methods.
+                two_factor.send_code(user, sign_in=True)
+            except email_codes.MailUnavailable:
+                pass
+        return Response({
+            "two_factor_required": True, **sign_in_challenge(user, methods),
+            "csrf_token": get_token(request),
+        })
     request.session.pop(PENDING_2FA, None)
     request.session.pop(GOOGLE_NONCE, None)
     session_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     # Django rotates the CSRF secret on login. Return a token for the new secret.
     return Response({"email": user.email, "csrf_token": get_token(request)})
+
+
+def sign_in_challenge(user, methods):
+    email = two_factor.EMAIL in methods
+    return {
+        "methods": methods,
+        "email_hint": email_codes.mask(user.email) if email else None,
+        "email_code_sent": bool(email and email_codes.pending_email(user, email_codes.SIGN_IN)),
+        "resend_in": email_codes.retry_after(user, email_codes.SIGN_IN) if email else 0,
+    }
 
 
 def code_from(request):
@@ -110,34 +139,86 @@ def code_from(request):
     return code if isinstance(code, str) and len(code) <= 32 else None
 
 
+def method_code_from(request):
+    """Returns (method, code) from exactly {"method", "code"}, or (None, None)."""
+    if not isinstance(request.data, dict) or set(request.data) != {"method", "code"}:
+        return None, None
+    method, code = request.data["method"], request.data["code"]
+    if (method not in (two_factor.EMAIL, two_factor.TOTP, two_factor.RECOVERY)
+            or not isinstance(code, str) or len(code) > 32):
+        return None, None
+    return method, code
+
+
+def code_refusal(result, method):
+    """The response for a refused second-step code."""
+    if method == two_factor.EMAIL:
+        return {
+            two_factor.LOCKED: Response(EMAIL_LOCKED_CODE, status=429),
+            two_factor.EXPIRED: Response(EMAIL_EXPIRED, status=400),
+            two_factor.NO_CODE: Response(EMAIL_NO_CODE, status=400),
+        }.get(result, Response(EMAIL_INVALID_CODE, status=400))
+    if result == two_factor.LOCKED:
+        return Response(LOCKED_CODE, status=429)
+    return Response(RECOVERY_INVALID_CODE if method == two_factor.RECOVERY else INVALID_CODE, status=400)
+
+
+def pending_sign_in_user(request):
+    """The user waiting at the second step, or None (and the pending state is cleared)."""
+    pending = request.session.get(PENDING_2FA)
+    if isinstance(pending, dict) and pending.get("expires", 0) >= time.time():
+        user = User.objects.filter(pk=pending.get("user"), is_active=True).first()
+        if user is not None and user.two_factor_enabled:
+            return user
+    request.session.pop(PENDING_2FA, None)
+    return None
+
+
 @never_cache
 @api_view(["POST"])
 @authentication_classes([CSRFAuthentication])
 @permission_classes([AllowAny])
 @sensitive_variables()
 def two_factor_verify(request):
-    pending = request.session.get(PENDING_2FA)
-    if not isinstance(pending, dict) or pending.get("expires", 0) < time.time():
-        request.session.pop(PENDING_2FA, None)
-        return Response({"detail": "Your sign-in expired. Please sign in again."}, status=401)
-    code = code_from(request)
-    if code is None:
-        return Response(INVALID_CODE, status=400)
     try:
-        user = User.objects.filter(pk=pending.get("user"), is_active=True).first()
-        if user is None or not user.two_factor_enabled:
-            request.session.pop(PENDING_2FA, None)
-            return Response({"detail": "Your sign-in expired. Please sign in again."}, status=401)
-        result = two_factor.check_code(user, code)
-        if result == two_factor.LOCKED:
-            return Response(LOCKED_CODE, status=429)
-        if result != two_factor.OK:
+        user = pending_sign_in_user(request)
+        if user is None:
+            return Response(SIGN_IN_EXPIRED, status=401)
+        method, code = method_code_from(request)
+        if method is None:
             return Response(INVALID_CODE, status=400)
+        result = two_factor.authorize(user, method, code, purpose="sign_in")
+        if result != two_factor.OK:
+            return code_refusal(result, method)
         request.session.pop(PENDING_2FA)
         session_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     except DatabaseError:
         return Response({"detail": "Sign-in is temporarily unavailable. Please try again."}, status=503)
     return Response({"email": user.email, "csrf_token": get_token(request)})
+
+
+@never_cache
+@api_view(["POST"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+def two_factor_resend(request):
+    """Sends a new sign-in code to the account email while the second step is pending."""
+    try:
+        user = pending_sign_in_user(request)
+        if user is None:
+            return Response(SIGN_IN_EXPIRED, status=401)
+        methods = two_factor.methods(user)
+        if request.data or two_factor.EMAIL not in methods:
+            return Response({"detail": "No email code can be sent for this sign-in."}, status=400)
+        result, _ = two_factor.send_code(user, sign_in=True)
+    except email_codes.MailUnavailable:
+        return Response(EMAIL_UNAVAILABLE, status=503)
+    except DatabaseError:
+        return Response({"detail": "Sign-in is temporarily unavailable. Please try again."}, status=503)
+    body = {**sign_in_challenge(user, methods), "csrf_token": get_token(request)}
+    if result == email_codes.RATE_LIMITED:
+        return Response({**body, "detail": "Please wait before requesting another code."}, status=429)
+    return Response(body)
 
 
 def google_nonce(request):
@@ -206,18 +287,24 @@ def google_sign_in(request):
         return Response({"detail": "Sign-in is temporarily unavailable. Please try again."}, status=503)
 
 
-def security_state(request, user, **extra):
+def security_state(request, user, status=200, **extra):
+    user = User.objects.get(pk=user.pk)
     return Response({
         "google_available": bool(google.client_id()),
         "google_linked": user.google_linked,
         "has_password": user.has_usable_password(),
         "two_factor_enabled": user.two_factor_enabled,
+        "email_two_factor_enabled": user.email_two_factor,
+        "totp_enabled": user.totp_enabled,
         "recovery_codes_remaining": (
             two_factor.recovery_codes_remaining(user) if user.two_factor_enabled else 0
         ),
+        "email": user.email,
+        "email_code_pending": bool(email_codes.pending_email(user, email_codes.SECURITY)),
+        "email_resend_in": email_codes.retry_after(user, email_codes.SECURITY),
         "csrf_token": get_token(request),
         **extra,
-    })
+    }, status=status)
 
 
 @never_cache
@@ -275,21 +362,84 @@ def google_link(request):
     return security_state(request, user)
 
 
+def signed_in(view):
+    """Session and database errors shared by the security views."""
+    @wraps(view)
+    def wrapper(request):
+        if not request.user.is_authenticated:
+            return Response(UNAUTHENTICATED, status=401)
+        try:
+            return view(request, request.user)
+        except DatabaseError:
+            return Response(SAVING_UNAVAILABLE, status=503)
+    return wrapper
+
+
 @never_cache
 @api_view(["POST"])
 @authentication_classes([CSRFAuthentication])
 @permission_classes([AllowAny])
-def two_factor_setup(request):
-    if not request.user.is_authenticated:
-        return Response(UNAUTHENTICATED, status=401)
+@signed_in
+def two_factor_email_code(request, user):
+    """Emails a code for turning email codes on, or for confirming a change."""
     if request.data:
         return Response({"detail": "No fields are accepted."}, status=400)
     try:
-        setup = two_factor.start_setup(request.user)
-    except DatabaseError:
-        return Response({"detail": "Saving is temporarily unavailable. Please try again."}, status=503)
+        result, retry_after = two_factor.send_code(user, sign_in=False)
+    except email_codes.MailUnavailable:
+        return Response(EMAIL_UNAVAILABLE, status=503)
+    if result == email_codes.RATE_LIMITED:
+        return security_state(request, user, status=429, retry_after=retry_after,
+                              detail="Please wait before requesting another code.")
+    return security_state(request, user, detail=f"We sent a 6-digit code to {user.email}.")
+
+
+@never_cache
+@api_view(["POST"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+@signed_in
+@sensitive_variables()
+def two_factor_email_enable(request, user):
+    code = code_from(request)
+    if code is None:
+        return Response(EMAIL_INVALID_CODE, status=400)
+    result, codes = two_factor.enable_email(user, code)
+    if result == two_factor.ALREADY:
+        return Response({"detail": "Email codes are already on."}, status=409)
+    if result != two_factor.OK:
+        return code_refusal(result, two_factor.EMAIL)
+    # Recovery codes are shown once; only their digests are stored.
+    return security_state(request, user, recovery_codes=codes)
+
+
+@never_cache
+@api_view(["POST"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+@signed_in
+@sensitive_variables()
+def two_factor_email_disable(request, user):
+    method, code = method_code_from(request)
+    if method is None:
+        return Response(INVALID_CODE, status=400)
+    result = two_factor.disable_email(user, method, code)
+    if result != two_factor.OK:
+        return code_refusal(result, method)
+    return security_state(request, user)
+
+
+@never_cache
+@api_view(["POST"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+@signed_in
+def two_factor_setup(request, user):
+    if request.data:
+        return Response({"detail": "No fields are accepted."}, status=400)
+    setup = two_factor.start_setup(user)
     if setup is None:
-        return Response({"detail": "Two-factor authentication is already on."}, status=409)
+        return Response({"detail": "The authenticator app is already on."}, status=409)
     return Response({**setup, "csrf_token": get_token(request)})
 
 
@@ -297,45 +447,33 @@ def two_factor_setup(request):
 @api_view(["POST"])
 @authentication_classes([CSRFAuthentication])
 @permission_classes([AllowAny])
+@signed_in
 @sensitive_variables()
-def two_factor_enable(request):
-    if not request.user.is_authenticated:
-        return Response(UNAUTHENTICATED, status=401)
+def two_factor_enable(request, user):
     code = code_from(request)
     if code is None:
         return Response(INVALID_CODE, status=400)
-    try:
-        result, codes = two_factor.confirm_setup(request.user, code)
-    except DatabaseError:
-        return Response({"detail": "Saving is temporarily unavailable. Please try again."}, status=503)
-    if result == two_factor.LOCKED:
-        return Response(LOCKED_CODE, status=429)
+    result, codes = two_factor.confirm_setup(user, code)
     if result != two_factor.OK:
-        return Response(INVALID_CODE, status=400)
-    # Recovery codes are shown once; only their digests are stored.
-    return security_state(request, request.user, recovery_codes=codes)
+        return code_refusal(result, two_factor.TOTP)
+    # Recovery codes come only with the first method; otherwise the existing ones stay.
+    return security_state(request, user, recovery_codes=codes)
 
 
 @never_cache
 @api_view(["POST"])
 @authentication_classes([CSRFAuthentication])
 @permission_classes([AllowAny])
+@signed_in
 @sensitive_variables()
-def two_factor_disable(request):
-    if not request.user.is_authenticated:
-        return Response(UNAUTHENTICATED, status=401)
-    code = code_from(request)
-    if code is None:
+def two_factor_disable(request, user):
+    method, code = method_code_from(request)
+    if method is None:
         return Response(INVALID_CODE, status=400)
-    try:
-        result = two_factor.disable(request.user, code)
-    except DatabaseError:
-        return Response({"detail": "Saving is temporarily unavailable. Please try again."}, status=503)
-    if result == two_factor.LOCKED:
-        return Response(LOCKED_CODE, status=429)
+    result = two_factor.disable_totp(user, method, code)
     if result != two_factor.OK:
-        return Response(INVALID_CODE, status=400)
-    return security_state(request, request.user)
+        return code_refusal(result, method)
+    return security_state(request, user)
 
 
 @never_cache
