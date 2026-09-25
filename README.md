@@ -3,7 +3,8 @@
 A university team project for campus navigation, room and faculty search, campus
 services, and student schedules. **US-01 provides the project and database
 foundation; US-02 adds email registration; US-03 adds session-based email login
-and logout; US-04 adds profile type selection.** Campus features are not
+and logout; US-04 adds profile type selection; US-05 adds Continue with Google and optional
+two-step verification.** Campus features are not
 implemented. Registration does not sign users in automatically. This is a first
 working version of Sprint 1, not a production-ready release.
 
@@ -151,6 +152,12 @@ administrative access. See the
 [US-04 profile guide](docs/profile.md) for the API, rejection rules, verification
 results, and manual checks.
 
+**Continue with Google** appears under the password form when
+`GOOGLE_OAUTH_CLIENT_ID` is set. The profile's **Sign-in and security** section
+connects Google to an existing account and turns optional two-step verification
+(authenticator app plus recovery codes) on or off. See the
+[US-05 guide](docs/google-and-two-factor.md) for setup, API, and security decisions.
+
 Behind the account screens is a single photograph of the SDU main entrance,
 loaded once and never reloaded. Login, registration, and the profile are three
 crops of that one picture, and the crop moves smoothly between them. These are
@@ -199,7 +206,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 48 backend tests pass (`accounts` and `core`). Quick manual pass:
+All 79 backend tests pass (`accounts` and `core`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 

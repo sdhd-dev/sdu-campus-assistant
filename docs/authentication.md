@@ -78,4 +78,5 @@ engines and deployed HTTPS have not been verified.
 4. Use DevTools Offline mode during login/logout; confirm a clear error and retry
    after reconnecting. Check keyboard navigation, mobile layout, and **Service status**.
 
-2FA, social/username login, password reset, and profile editing remain out of scope.
+Username login and password reset remain out of scope. Google sign-in and
+optional 2FA were added in [US-05](google-and-two-factor.md).
