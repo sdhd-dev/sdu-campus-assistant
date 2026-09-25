@@ -19,6 +19,25 @@ class User(AbstractUser):
     # Google's stable account id ("sub"), not the Google email, which can change.
     google_subject = models.CharField(max_length=255, unique=True, null=True, blank=True)
 
+    class VerifiedAffiliation(models.TextChoices):
+        STUDENT = "STUDENT", "Student"
+        STAFF = "STAFF", "Staff"
+
+    class AffiliationSource(models.TextChoices):
+        EMAIL = "EMAIL", "University email code"
+        # Reserved: a verified Google Workspace "hd" claim on a university domain.
+        GOOGLE_WORKSPACE = "GOOGLE_WORKSPACE", "Google Workspace"
+
+    # Proven status, kept apart from the self-selected profile_type. Grants no permissions.
+    verified_affiliation = models.CharField(
+        max_length=7, choices=VerifiedAffiliation.choices, null=True, blank=True,
+    )
+    university_email = models.EmailField(max_length=254, null=True, blank=True)
+    affiliation_verified_at = models.DateTimeField(null=True, blank=True)
+    affiliation_source = models.CharField(
+        max_length=16, choices=AffiliationSource.choices, null=True, blank=True,
+    )
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
     objects = UserManager()
@@ -29,6 +48,22 @@ class User(AbstractUser):
             models.CheckConstraint(
                 condition=models.Q(profile_type__in=["STUDENT", "STAFF", "VISITOR"]),
                 name="accounts_user_valid_profile_type",
+            ),
+            # One university address proves a status for one account only.
+            models.UniqueConstraint(
+                Lower("university_email"), name="accounts_user_university_email_ci_unique",
+            ),
+            # Either every verification field is set, or none is.
+            models.CheckConstraint(
+                condition=models.Q(
+                    verified_affiliation__isnull=True, university_email__isnull=True,
+                    affiliation_verified_at__isnull=True, affiliation_source__isnull=True,
+                ) | models.Q(
+                    verified_affiliation__in=["STUDENT", "STAFF"], university_email__isnull=False,
+                    affiliation_verified_at__isnull=False,
+                    affiliation_source__in=["EMAIL", "GOOGLE_WORKSPACE"],
+                ),
+                name="accounts_user_verified_affiliation_consistent",
             ),
         ]
 
@@ -69,3 +104,24 @@ class RecoveryCode(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["user", "code_hash"], name="accounts_recovery_code_unique"),
         ]
+
+
+class UniversityEmailChallenge(models.Model):
+    """The one pending university email code for a user. Only a keyed digest is stored."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="university_email_challenge",
+    )
+    email = models.EmailField(max_length=254)
+    code_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+
+
+class UniversityEmailSend(models.Model):
+    """One code request, kept for an hour to rate-limit per account and per address."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    # A keyed digest, so the table does not collect addresses.
+    email_digest = models.CharField(max_length=64, db_index=True)
+    sent_at = models.DateTimeField(db_index=True)
