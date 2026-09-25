@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SecurityPanel from './SecurityPanel.jsx';
+import UniversityStatusPanel from './UniversityStatusPanel.jsx';
 import { SESSION_EXPIRED as EXPIRED, apiRequest, authRequest, isProfile } from './auth.js';
 
 // The server owns the list of values; this only adds copy and an icon for the ones we know.
@@ -253,6 +254,8 @@ export default function ProfilePanel({ session, onSignedOut }) {
           </p>
         </form>
       )}
+
+      <UniversityStatusPanel onSignedOut={onSignedOut} />
 
       <SecurityPanel onSignedOut={onSignedOut} />
 

@@ -38,3 +38,13 @@ export function isSecurity(data) {
       .every((key) => typeof data[key] === 'boolean')
     && Number.isInteger(data.recovery_codes_remaining);
 }
+
+export function isVerification(data) {
+  const text = (value) => value === null || (typeof value === 'string' && Boolean(value));
+  return typeof data?.csrf_token === 'string' && Boolean(data.csrf_token)
+    && [null, 'STUDENT', 'STAFF'].includes(data.verified_affiliation)
+    && text(data.university_email) && text(data.verified_at) && text(data.pending_email)
+    && Number.isInteger(data.resend_in) && data.resend_in >= 0
+    && ['student_domains', 'staff_domains'].every((key) => Array.isArray(data[key])
+      && data[key].every((domain) => typeof domain === 'string'));
+}
