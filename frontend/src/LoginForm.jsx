@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import EyeIcon from './EyeIcon.jsx';
+import GoogleButton from './GoogleButton.jsx';
+import TwoFactorStep from './TwoFactorStep.jsx';
 import { authRequest, isSession } from './auth.js';
+
+function isChallenge(data) {
+  return data?.two_factor_required === true && typeof data.csrf_token === 'string' && Boolean(data.csrf_token);
+}
 
 export default function LoginForm({ onLogin, notice }) {
   const [email, setEmail] = useState('');
@@ -11,6 +17,7 @@ export default function LoginForm({ onLogin, notice }) {
   const [setupError, setSetupError] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [challenge, setChallenge] = useState('');
   const messageRef = useRef(null);
   const inFlight = useRef(false);
   const submission = useRef(null);
@@ -28,8 +35,8 @@ export default function LoginForm({ onLogin, notice }) {
   useEffect(() => () => submission.current?.abort(), []);
   useEffect(() => { if (message) messageRef.current?.focus(); }, [message]);
 
-  async function submit(event) {
-    event.preventDefault();
+  // Password and Google sign-in share one path: either a session, or the 2FA step.
+  const signIn = useCallback(async (path, body, rejected) => {
     if (inFlight.current || !token) return;
     inFlight.current = true;
     setPending(true);
@@ -37,19 +44,24 @@ export default function LoginForm({ onLogin, notice }) {
     const controller = new AbortController();
     submission.current = controller;
     try {
-      const { response, data } = await authRequest('login', {
+      const { response, data } = await authRequest(path, {
         method: 'POST', signal: controller.signal,
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': token },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify(body),
       });
-      if (response.status === 400 || response.status === 401) {
-        setMessage('Invalid email or password. Please try again.');
-      } else if (response.status === 403) {
+      if (response.status === 403) {
         setToken('');
         setAttempt((value) => value + 1);
         setMessage('Your security check expired. Please try again once the form is ready.');
+      } else if (!response.ok) {
+        const text = rejected(response.status, data);
+        if (!text) throw new Error('Sign-in failed');
+        setMessage(text);
+      } else if (isChallenge(data)) {
+        setPassword('');
+        setChallenge(data.csrf_token);
       } else {
-        if (!response.ok || !isSession(data)) throw new Error('Sign-in failed');
+        if (!isSession(data)) throw new Error('Sign-in failed');
         setPassword('');
         onLogin(data);
       }
@@ -62,6 +74,28 @@ export default function LoginForm({ onLogin, notice }) {
       inFlight.current = false;
       setPending(false);
     }
+  }, [onLogin, token]);
+
+  function submit(event) {
+    event.preventDefault();
+    signIn('login', { email: email.trim(), password }, (status) => (
+      status === 400 || status === 401 ? 'Invalid email or password. Please try again.' : ''
+    ));
+  }
+
+  const google = useCallback((credential) => {
+    signIn('google', { credential }, (status, data) => (
+      [400, 401, 404, 409, 503].includes(status) && typeof data?.detail === 'string' ? data.detail : ''
+    ));
+  }, [signIn]);
+
+  if (challenge) {
+    return <TwoFactorStep token={challenge} onLogin={onLogin} onCancel={(text) => {
+      setChallenge('');
+      setToken('');
+      setAttempt((value) => value + 1);
+      setMessage(text);
+    }} />;
   }
 
   return (
@@ -104,6 +138,7 @@ export default function LoginForm({ onLogin, notice }) {
           {pending ? 'Signing in…' : token ? 'Sign in' : 'Preparing sign-in…'}
         </button>
       </form>
+      <GoogleButton onCredential={google} separated />
       <p className="form-note">New to Campus Assistant? <a href="#register">Create an account</a></p>
     </section>
   );

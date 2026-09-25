@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiRequest, authRequest, isProfile } from './auth.js';
-
-const EXPIRED = 'Your session has expired. Please sign in again.';
+import SecurityPanel from './SecurityPanel.jsx';
+import { SESSION_EXPIRED as EXPIRED, apiRequest, authRequest, isProfile } from './auth.js';
 
 // The server owns the list of values; this only adds copy and an icon for the ones we know.
 const DETAILS = {
@@ -254,6 +253,8 @@ export default function ProfilePanel({ session, onSignedOut }) {
           </p>
         </form>
       )}
+
+      <SecurityPanel onSignedOut={onSignedOut} />
 
       <div className="panel-footer">
         <button type="button" className="ghost-button" onClick={logout} disabled={pending}>
