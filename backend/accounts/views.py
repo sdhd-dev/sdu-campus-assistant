@@ -368,7 +368,7 @@ def profile(request):
         return Response(UNAUTHENTICATED, status=401)
     user = request.user
     if request.method == "PATCH":
-        serializer = ProfileSerializer(data=request.data)
+        serializer = ProfileSerializer(data=request.data, context={"user": user})
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
         try:
@@ -381,6 +381,9 @@ def profile(request):
     return Response({
         "email": user.email,
         "profile_type": user.profile_type,
+        "verified_affiliation": user.verified_affiliation,
+        "university_email": user.university_email,
+        "verification_available": university.enabled(),
         "profile_types": [
             {"value": value, "label": label} for value, label in User.ProfileType.choices
         ],
@@ -390,6 +393,7 @@ def profile(request):
 
 UNIVERSITY_DISABLED = {"detail": "University email verification isn’t configured for this server."}
 UNIVERSITY_ONLY = {"detail": "Enter your SDU student or staff email address."}
+UNIVERSITY_ROLE = {"detail": "Choose Student or Staff to verify."}
 UNIVERSITY_SENT = "If this address can be verified, we sent a 6-digit code to it."
 UNIVERSITY_RESULTS = {
     university.INVALID: (400, "That code isn’t valid. Check the email and try again."),
@@ -408,19 +412,26 @@ def verification_state(request, user, status=200, **extra):
     }, status=status)
 
 
-def university_email_from(request):
-    """Returns a normalized address on a configured university domain, or None."""
-    if not isinstance(request.data, dict) or set(request.data) != {"email"}:
-        return None
+def role_request_from(request):
+    """Returns (email, role) for an address whose domain proves the role, or (None, error)."""
+    if (not isinstance(request.data, dict) or set(request.data) != {"email", "role"}
+            or request.data["role"] not in User.VerifiedAffiliation.values):
+        return None, UNIVERSITY_ROLE
     email = request.data["email"]
     if not isinstance(email, str) or len(email) > 254:
-        return None
+        return None, UNIVERSITY_ONLY
     email = User.objects.normalize_email(email.strip()).lower()
     try:
         validate_email(email)
     except ValidationError:
-        return None
-    return email if university.affiliation_for_email(email) else None
+        return None, UNIVERSITY_ONLY
+    affiliation = university.affiliation_for_email(email)
+    if affiliation is None:
+        return None, UNIVERSITY_ONLY
+    if affiliation != request.data["role"]:
+        label = User.VerifiedAffiliation(affiliation).label
+        return None, {"detail": f"This is a {label.lower()} address. Choose {label} to verify it."}
+    return email, None
 
 
 def university_request(view):
@@ -455,9 +466,9 @@ def verification(request, user):
 @permission_classes([AllowAny])
 @university_request
 def verification_start(request, user):
-    email = university_email_from(request)
-    if email is None:
-        return Response(UNIVERSITY_ONLY, status=400)
+    email, error = role_request_from(request)
+    if error:
+        return Response(error, status=400)
     result, retry_after = university.start(user, email)
     if result == university.RATE_LIMITED:
         return verification_state(

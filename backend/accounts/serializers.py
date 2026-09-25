@@ -11,6 +11,7 @@ User = get_user_model()
 DUPLICATE_EMAIL = "An account with this email already exists."
 PROFILE_ONLY_FIELD = "Only profile_type is accepted."
 INVALID_PROFILE_TYPE = "Choose Student, Staff, or Visitor."
+UNVERIFIED_ROLE = "Verify your SDU email to choose {label}."
 
 
 class LoginSerializer(serializers.Serializer):
@@ -26,7 +27,11 @@ class LoginSerializer(serializers.Serializer):
 
 
 class ProfileSerializer(serializers.Serializer):
-    """Accepts profile_type alone. Affiliation is descriptive and grants no permissions."""
+    """Accepts profile_type alone. Affiliation is descriptive and grants no permissions.
+
+    Student and Staff are accepted only when they match the session user's verified
+    status; Visitor is always accepted. The database enforces the same rule.
+    """
 
     profile_type = serializers.ChoiceField(
         choices=User.ProfileType.choices,
@@ -43,6 +48,13 @@ class ProfileSerializer(serializers.Serializer):
         if not isinstance(data["profile_type"], str):
             raise serializers.ValidationError({"profile_type": [INVALID_PROFILE_TYPE]})
         return super().to_internal_value(data)
+
+    def validate_profile_type(self, value):
+        user = self.context["user"]
+        if value != User.ProfileType.VISITOR and value != user.verified_affiliation:
+            label = User.ProfileType(value).label
+            raise serializers.ValidationError(UNVERIFIED_ROLE.format(label=label))
+        return value
 
     def update(self, instance, validated_data):
         # update_fields keeps the UPDATE to this one column; no privilege field is written.

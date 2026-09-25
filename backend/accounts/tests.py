@@ -8,6 +8,7 @@ from django.contrib.auth.password_validation import password_validators_help_tex
 from django.db import IntegrityError, OperationalError, connections, transaction
 from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .serializers import RegistrationSerializer
@@ -27,7 +28,14 @@ class UserTests(TestCase):
     def test_profile_types_do_not_grant_privileges(self):
         for profile_type in User.ProfileType.values:
             with self.subTest(profile_type=profile_type):
-                user = User.objects.create_user(f"{profile_type}@example.com", profile_type=profile_type)
+                verified = {} if profile_type == "VISITOR" else {
+                    "verified_affiliation": profile_type, "affiliation_source": "EMAIL",
+                    "university_email": f"{profile_type}@verified.example",
+                    "affiliation_verified_at": timezone.now(),
+                }
+                user = User.objects.create_user(
+                    f"{profile_type}@example.com", profile_type=profile_type, **verified,
+                )
                 user.refresh_from_db()
                 self.assertFalse(user.is_staff)
                 self.assertFalse(user.is_superuser)

@@ -64,8 +64,9 @@ class UniversityEmailTests(TestCase):
             reverse(name), payload or {}, format="json", HTTP_X_CSRFTOKEN=token or self.token,
         )
 
-    def start(self, email=STUDENT_EMAIL, **kwargs):
-        return self.post("verification-start", {"email": email}, **kwargs)
+    def start(self, email=STUDENT_EMAIL, role=None, **kwargs):
+        role = role or ("STAFF" if email.strip().lower().endswith("@sdu.edu.kz") else "STUDENT")
+        return self.post("verification-start", {"email": email, "role": role}, **kwargs)
 
     def confirm(self, code, **kwargs):
         return self.post("verification-confirm", {"code": code}, **kwargs)
@@ -102,7 +103,7 @@ class UniversityEmailTests(TestCase):
     def test_state_shape(self):
         body = self.client.get(reverse("verification")).json()
         self.assertEqual(set(body), {
-            "verified_affiliation", "university_email", "verified_at", "pending_email",
+            "profile_type", "verified_affiliation", "university_email", "verified_at", "pending_email",
             "resend_in", "student_domains", "staff_domains", "csrf_token",
         })
         self.assertIsNone(body["verified_affiliation"])
@@ -112,9 +113,14 @@ class UniversityEmailTests(TestCase):
     # Requesting a code
 
     def test_only_exact_university_domains_are_accepted(self):
+        for email in ("person@gmail.com", "x@evil.sdu.edu.kz", "x@sdu.edu.kz.evil.com", "not-an-email", 42):
+            with self.subTest(email=email):
+                response = self.post("verification-start", {"email": email, "role": "STUDENT"})
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["detail"], "Enter your SDU student or staff email address.")
         for payload in (
-            {"email": "person@gmail.com"}, {"email": "x@evil.sdu.edu.kz"}, {"email": "x@sdu.edu.kz.evil.com"},
-            {"email": "not-an-email"}, {"email": 42}, {}, {"email": STUDENT_EMAIL, "role": "STAFF"},
+            {"email": STUDENT_EMAIL}, {}, {"email": STUDENT_EMAIL, "role": "VISITOR"},
+            {"email": STUDENT_EMAIL, "role": "student"}, {"email": STUDENT_EMAIL, "role": "STUDENT", "x": 1},
         ):
             with self.subTest(payload=payload):
                 self.assertEqual(self.post("verification-start", payload).status_code, 400)
@@ -183,24 +189,48 @@ class UniversityEmailTests(TestCase):
 
     # Confirming
 
-    def test_student_code_verifies_without_touching_profile_type_or_permissions(self):
-        User.objects.filter(pk=self.user.pk).update(profile_type="STAFF")
+    def test_domain_must_match_the_chosen_role(self):
+        student = self.start(STUDENT_EMAIL, role="STAFF")
+        self.assertEqual(student.status_code, 400)
+        self.assertEqual(student.json()["detail"], "This is a student address. Choose Student to verify it.")
+        staff = self.start(STAFF_EMAIL, role="STUDENT")
+        self.assertEqual(staff.json()["detail"], "This is a staff address. Choose Staff to verify it.")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_student_code_verifies_and_sets_the_role_without_permissions(self):
         self.start()
         response = self.confirm(self.last_code())
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["verified_affiliation"], "STUDENT")
+        self.assertEqual(response.json()["profile_type"], "STUDENT")
         self.assertEqual(response.json()["university_email"], STUDENT_EMAIL)
         self.assertIsNone(response.json()["pending_email"])
         self.user.refresh_from_db()
         self.assertEqual(self.user.verified_affiliation, "STUDENT")
         self.assertEqual(self.user.affiliation_source, "EMAIL")
-        self.assertEqual(self.user.profile_type, "STAFF")
+        self.assertEqual(self.user.profile_type, "STUDENT")
         self.assertFalse(self.user.is_staff or self.user.is_superuser)
         self.assertEqual(len(self.logged("verified")), 1)
 
     def test_staff_domain_gives_staff(self):
         self.start(STAFF_EMAIL)
-        self.assertEqual(self.confirm(self.last_code()).json()["verified_affiliation"], "STAFF")
+        body = self.confirm(self.last_code()).json()
+        self.assertEqual((body["verified_affiliation"], body["profile_type"]), ("STAFF", "STAFF"))
+
+    def test_verifying_the_other_role_replaces_the_first(self):
+        self.start()
+        self.confirm(self.last_code())
+        self.now += timedelta(seconds=61)
+        self.start(STAFF_EMAIL)
+        body = self.confirm(self.last_code()).json()
+        self.assertEqual((body["verified_affiliation"], body["profile_type"]), ("STAFF", "STAFF"))
+        self.assertEqual(body["university_email"], STAFF_EMAIL)
+
+    def test_failed_verification_keeps_the_previous_role(self):
+        self.start()
+        self.confirm(self.wrong(self.last_code()))
+        self.post("verification-cancel")
+        self.assertEqual(User.objects.get(pk=self.user.pk).profile_type, "VISITOR")
 
     def test_code_works_once(self):
         self.start()
@@ -274,6 +304,7 @@ class UniversityEmailTests(TestCase):
         removed = self.client.delete(reverse("verification"), HTTP_X_CSRFTOKEN=self.token)
         self.assertEqual(removed.status_code, 200)
         self.assertIsNone(removed.json()["verified_affiliation"])
+        self.assertEqual(removed.json()["profile_type"], "VISITOR")
         self.assertEqual(len(self.logged("verification_removed")), 1)
         other, other_token = self.sign_in(self.other)
         self.start(client=other, token=other_token)

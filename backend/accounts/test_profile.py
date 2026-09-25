@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.sessions.models import Session
-from django.db import OperationalError
+from django.db import IntegrityError, OperationalError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -57,6 +57,14 @@ class ProfileTests(TestCase):
             HTTP_X_CSRFTOKEN=self.token if token is None else token, **headers,
         )
 
+    def verify(self, user, affiliation):
+        """Stands in for a completed US-06 email verification."""
+        User.objects.filter(pk=user.pk).update(
+            verified_affiliation=affiliation, university_email=f"{user.pk}@verified.example",
+            affiliation_verified_at=timezone.now(), affiliation_source="EMAIL",
+        )
+        user.refresh_from_db()
+
     def assertAdministrativeFlagsUnchanged(self, user=None):
         user = user or self.user
         user.refresh_from_db()
@@ -105,9 +113,13 @@ class ProfileTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(set(body), {"email", "profile_type", "profile_types", "csrf_token"})
+        self.assertEqual(set(body), {
+            "email", "profile_type", "verified_affiliation", "university_email", "verification_available",
+            "profile_types", "csrf_token",
+        })
         self.assertEqual(body["email"], self.user.email)
         self.assertEqual(body["profile_type"], User.ProfileType.VISITOR)
+        self.assertIsNone(body["verified_affiliation"])
         self.assertEqual(body["profile_types"], [
             {"value": "STUDENT", "label": "Student"},
             {"value": "STAFF", "label": "Staff"},
@@ -119,18 +131,39 @@ class ProfileTests(TestCase):
 
     # Valid updates
 
-    def test_every_supported_value_is_saved_and_returned(self):
-        for value in User.ProfileType.values:
+    def test_visitor_is_always_accepted(self):
+        response = self.patch({"profile_type": "VISITOR"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["profile_type"], "VISITOR")
+        self.assertEqual(response.json()["email"], self.user.email)
+        self.assertAdministrativeFlagsUnchanged()
+
+    def test_student_and_staff_are_rejected_without_verification(self):
+        for value, label in (("STUDENT", "Student"), ("STAFF", "Staff")):
             with self.subTest(profile_type=value):
                 response = self.patch({"profile_type": value})
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json()["profile_type"], value)
-                self.assertEqual(response.json()["email"], self.user.email)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json(), {
+                    "profile_type": [f"Verify your SDU email to choose {label}."],
+                })
                 self.user.refresh_from_db()
-                self.assertEqual(self.user.profile_type, value)
+                self.assertEqual(self.user.profile_type, User.ProfileType.VISITOR)
+
+    def test_verified_role_is_chosen_again_without_a_new_code(self):
+        self.verify(self.user, "STUDENT")
+        self.assertEqual(self.patch({"profile_type": "STUDENT"}).status_code, 200)
+        self.assertEqual(self.patch({"profile_type": "VISITOR"}).status_code, 200)
+        response = self.patch({"profile_type": "STUDENT"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["verified_affiliation"], "STUDENT")
+        # A student verification does not open the Staff role.
+        self.assertEqual(self.patch({"profile_type": "STAFF"}).status_code, 400)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.profile_type, "STUDENT")
         self.assertAdministrativeFlagsUnchanged()
 
     def test_saved_selection_survives_logout_and_a_later_login(self):
+        self.verify(self.user, "STUDENT")
         self.assertEqual(self.patch({"profile_type": "STUDENT"}).status_code, 200)
         self.assertEqual(
             self.client.post(reverse("logout"), HTTP_X_CSRFTOKEN=self.token).status_code, 204
@@ -142,9 +175,11 @@ class ProfileTests(TestCase):
     def test_update_touches_only_the_profile_column_of_the_session_user(self):
         group = Group.objects.create(name="campus-admins")
         group.permissions.add(Permission.objects.first())
+        self.verify(self.other, "STUDENT")
         self.other.profile_type = User.ProfileType.STUDENT
         self.other.is_staff = True
         self.other.save()
+        self.verify(self.user, "STAFF")
 
         self.assertEqual(self.patch({"profile_type": "STAFF"}).status_code, 200)
 
@@ -156,6 +191,7 @@ class ProfileTests(TestCase):
         self.assertTrue(self.other.is_staff)
 
     def test_staff_affiliation_grants_no_administrative_access(self):
+        self.verify(self.user, "STAFF")
         self.assertEqual(self.patch({"profile_type": "STAFF"}).status_code, 200)
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_staff)
@@ -243,6 +279,7 @@ class ProfileTests(TestCase):
 
         # The session still works, and a correctly signed request succeeds.
         self.assertEqual(self.client.get(self.url).status_code, 200)
+        self.verify(self.user, "STAFF")
         self.assertEqual(self.patch(
             {"profile_type": "STAFF"}, HTTP_ORIGIN="http://127.0.0.1:5173"
         ).status_code, 200)
@@ -261,9 +298,14 @@ class ProfileTests(TestCase):
     def test_database_error_while_saving_has_a_generic_response(self):
         with patch("accounts.serializers.ProfileSerializer.update",
                    side_effect=OperationalError("private database details")):
-            response = self.patch({"profile_type": "STUDENT"})
+            response = self.patch({"profile_type": "VISITOR"})
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json(), {
             "detail": "Saving your profile is temporarily unavailable. Please try again."
         })
         self.assertNotContains(response, "private", status_code=503)
+
+    def test_database_rejects_an_unverified_role_written_directly(self):
+        self.user.profile_type = User.ProfileType.STAFF
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self.user.save(update_fields=["profile_type"])

@@ -43,7 +43,8 @@ def affiliation_for_email(email):
 
 
 def start(user, email):
-    """Sends a code to a university address. Returns (result, retry_after_seconds).
+    """Sends a code to a university address whose domain the caller has matched to the
+    requested role. Returns (result, retry_after_seconds).
 
     An address already verified for another account gets no email, but the caller sees
     exactly the same result, so this cannot be used to discover whose address it is.
@@ -55,7 +56,8 @@ def start(user, email):
 
 
 def confirm(user, code):
-    """Checks the pending code and, if it matches, records the verified status."""
+    """Checks the pending code and, if it matches, records the verified status and makes it
+    the user's role."""
     now = timezone.now()
     with transaction.atomic():
         result, email = email_codes.check(user, email_codes.ROLE, code)
@@ -72,14 +74,16 @@ def confirm(user, code):
             with transaction.atomic():
                 if User.objects.filter(university_email__iexact=email).exclude(pk=user.pk).exists():
                     raise IntegrityError
+                # The verified role becomes the chosen role in the same write.
                 User.objects.filter(pk=user.pk).update(
                     university_email=email, verified_affiliation=affiliation,
                     affiliation_verified_at=now, affiliation_source=User.AffiliationSource.EMAIL,
+                    profile_type=affiliation,
                 )
         except IntegrityError:
             log.warning("verification_conflict user=%s email=%s", user.pk, mask(email))
             return TAKEN
-    user.refresh_from_db(fields=VERIFICATION_FIELDS)
+    user.refresh_from_db(fields=[*VERIFICATION_FIELDS, "profile_type"])
     log.info("verified user=%s email=%s affiliation=%s", user.pk, mask(email), affiliation)
     return OK
 
@@ -89,18 +93,21 @@ def cancel(user):
 
 
 def remove(user):
-    """Clears the verified status and frees the address for another account."""
+    """Clears the verified status, returns the role to Visitor, and frees the address."""
     with transaction.atomic():
         email_codes.discard(user, email_codes.ROLE)
         previous = user.university_email
-        User.objects.filter(pk=user.pk).update(**dict.fromkeys(VERIFICATION_FIELDS))
-    user.refresh_from_db(fields=VERIFICATION_FIELDS)
+        User.objects.filter(pk=user.pk).update(
+            **dict.fromkeys(VERIFICATION_FIELDS), profile_type=User.ProfileType.VISITOR,
+        )
+    user.refresh_from_db(fields=[*VERIFICATION_FIELDS, "profile_type"])
     if previous:
         log.info("verification_removed user=%s email=%s", user.pk, mask(previous))
 
 
 def state(user):
     return {
+        "profile_type": user.profile_type,
         "verified_affiliation": user.verified_affiliation,
         "university_email": user.university_email,
         "verified_at": user.affiliation_verified_at.isoformat() if user.affiliation_verified_at else None,
