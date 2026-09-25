@@ -1,10 +1,13 @@
 import secrets
 import time
+from functools import wraps
 
 from django.contrib.auth import (
     authenticate, get_user_model, login as session_login, logout as session_logout,
 )
 from django.contrib.auth.password_validation import password_validators_help_texts
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import DatabaseError, IntegrityError, transaction
 from django.middleware.csrf import get_token
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
@@ -14,7 +17,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from . import google, two_factor
+from . import google, two_factor, university
 from .serializers import LoginSerializer, ProfileSerializer, RegistrationSerializer
 
 User = get_user_model()
@@ -383,3 +386,107 @@ def profile(request):
         ],
         "csrf_token": get_token(request),
     })
+
+
+UNIVERSITY_DISABLED = {"detail": "University email verification isn’t configured for this server."}
+UNIVERSITY_ONLY = {"detail": "Enter your SDU student or staff email address."}
+UNIVERSITY_SENT = "If this address can be verified, we sent a 6-digit code to it."
+UNIVERSITY_RESULTS = {
+    university.INVALID: (400, "That code isn’t valid. Check the email and try again."),
+    university.EXPIRED: (400, "This code has expired. Request a new one."),
+    university.NO_CODE: (400, "Request a new code first."),
+    university.LOCKED: (429, "Too many incorrect codes. Request a new one."),
+    university.NOT_UNIVERSITY: (400, UNIVERSITY_ONLY["detail"]),
+    university.TAKEN: (409, "This university email is already verified for another account."),
+}
+UNIVERSITY_UNAVAILABLE = {"detail": "Verification is temporarily unavailable. Please try again."}
+
+
+def verification_state(request, user, status=200, **extra):
+    return Response({
+        **university.state(user), "csrf_token": get_token(request), **extra,
+    }, status=status)
+
+
+def university_email_from(request):
+    """Returns a normalized address on a configured university domain, or None."""
+    if not isinstance(request.data, dict) or set(request.data) != {"email"}:
+        return None
+    email = request.data["email"]
+    if not isinstance(email, str) or len(email) > 254:
+        return None
+    email = User.objects.normalize_email(email.strip()).lower()
+    try:
+        validate_email(email)
+    except ValidationError:
+        return None
+    return email if university.affiliation_for_email(email) else None
+
+
+def university_request(view):
+    """Session, feature switch, and database errors shared by the verification views."""
+    @wraps(view)
+    def wrapper(request):
+        if not request.user.is_authenticated:
+            return Response(UNAUTHENTICATED, status=401)
+        if not university.enabled():
+            return Response(UNIVERSITY_DISABLED, status=404)
+        try:
+            return view(request, request.user)
+        except (DatabaseError, university.MailUnavailable):
+            return Response(UNIVERSITY_UNAVAILABLE, status=503)
+    return wrapper
+
+
+@never_cache
+@api_view(["GET", "DELETE"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+@university_request
+def verification(request, user):
+    if request.method == "DELETE":
+        university.remove(user)
+    return verification_state(request, user)
+
+
+@never_cache
+@api_view(["POST"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+@university_request
+def verification_start(request, user):
+    email = university_email_from(request)
+    if email is None:
+        return Response(UNIVERSITY_ONLY, status=400)
+    result, retry_after = university.start(user, email)
+    if result == university.RATE_LIMITED:
+        return verification_state(
+            request, user, status=429, retry_after=retry_after,
+            detail="Please wait before requesting another code.",
+        )
+    return verification_state(request, user, detail=UNIVERSITY_SENT)
+
+
+@never_cache
+@api_view(["POST"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+@university_request
+@sensitive_variables()
+def verification_confirm(request, user):
+    code = code_from(request)
+    result = university.confirm(user, code) if code is not None else university.INVALID
+    if result != university.OK:
+        status, detail = UNIVERSITY_RESULTS[result]
+        return verification_state(request, user, status=status, detail=detail)
+    return verification_state(request, user)
+
+
+@never_cache
+@api_view(["POST"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+@university_request
+def verification_cancel(request, user):
+    university.cancel(user)
+    return verification_state(request, user)

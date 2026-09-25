@@ -73,3 +73,35 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Optional. Without a client ID, "Continue with Google" is hidden and its API refuses requests.
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+
+
+def domain_list(name):
+    return frozenset(
+        domain.strip().lstrip("@").lower()
+        for domain in os.environ.get(name, "").split(",") if domain.strip()
+    )
+
+
+# Optional. Without any domain, university email verification is hidden and its API refuses requests.
+UNIVERSITY_STUDENT_DOMAINS = domain_list("UNIVERSITY_STUDENT_DOMAINS")
+UNIVERSITY_STAFF_DOMAINS = domain_list("UNIVERSITY_STAFF_DOMAINS")
+if UNIVERSITY_STUDENT_DOMAINS & UNIVERSITY_STAFF_DOMAINS:
+    raise ImproperlyConfigured("A university domain cannot be both a student and a staff domain.")
+
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "").strip() or "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "").strip() or 587)
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "").strip()
+EMAIL_USE_TLS = (os.environ.get("EMAIL_USE_TLS", "").strip().lower() or "true") in {"1", "true", "yes"}
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "").strip() or "webmaster@localhost"
+
+# Security events go to the console. Codes, secrets, and full addresses are never logged.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "{asctime} {levelname} {name} {message}", "style": "{"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "loggers": {"accounts": {"handlers": ["console"], "level": "INFO", "propagate": False}},
+}

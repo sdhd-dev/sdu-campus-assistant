@@ -42,4 +42,11 @@ def verify_credential(credential, nonce):
     subject, email = claims.get("sub"), claims.get("email")
     if not subject or not email or claims.get("email_verified") is not True:
         raise InvalidGoogleCredential
-    return {"subject": subject, "email": email.strip().lower()}
+    return {
+        "subject": subject,
+        "email": email.strip().lower(),
+        # Set only for Google Workspace accounts. Unused for now: if university mail moves to
+        # Workspace, university.affiliation_for_domain(hosted_domain) could verify the status.
+        # The email domain alone must never be trusted for that; only "hd" proves it.
+        "hosted_domain": claims.get("hd"),
+    }

@@ -15,6 +15,11 @@ if len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 5 or SECRET_KEY.startswith("dj
 DATABASES["default"]["OPTIONS"]["sslmode"] = "verify-full"
 if os.environ.get("POSTGRES_SSLROOTCERT"):
     DATABASES["default"]["OPTIONS"]["sslrootcert"] = os.environ["POSTGRES_SSLROOTCERT"]
+if UNIVERSITY_STUDENT_DOMAINS or UNIVERSITY_STAFF_DOMAINS:
+    if EMAIL_BACKEND != "django.core.mail.backends.smtp.EmailBackend":
+        raise ImproperlyConfigured("University email verification requires the SMTP email backend.")
+    for name in ("EMAIL_HOST", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD", "DEFAULT_FROM_EMAIL"):
+        required_env(name)
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
