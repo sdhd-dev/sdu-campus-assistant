@@ -29,7 +29,10 @@ export function isProfile(data) {
     && Array.isArray(data.profile_types) && data.profile_types.length > 0
     && data.profile_types.every((option) => typeof option?.value === 'string'
       && Boolean(option.value) && typeof option.label === 'string' && Boolean(option.label))
-    && data.profile_types.some((option) => option.value === data.profile_type);
+    && data.profile_types.some((option) => option.value === data.profile_type)
+    && [null, 'STUDENT', 'STAFF'].includes(data.verified_affiliation)
+    && (data.university_email === null || typeof data.university_email === 'string')
+    && typeof data.verification_available === 'boolean';
 }
 
 export function isSecurity(data) {
@@ -42,6 +45,7 @@ export function isSecurity(data) {
 export function isVerification(data) {
   const text = (value) => value === null || (typeof value === 'string' && Boolean(value));
   return typeof data?.csrf_token === 'string' && Boolean(data.csrf_token)
+    && ['STUDENT', 'STAFF', 'VISITOR'].includes(data.profile_type)
     && [null, 'STUDENT', 'STAFF'].includes(data.verified_affiliation)
     && text(data.university_email) && text(data.verified_at) && text(data.pending_email)
     && Number.isInteger(data.resend_in) && data.resend_in >= 0

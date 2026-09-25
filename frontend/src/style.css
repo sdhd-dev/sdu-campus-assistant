@@ -699,6 +699,54 @@ input[readonly] { background: var(--teal-50); color: var(--ink-soft); }
   line-height: 1.5;
 }
 
+.verified-badge {
+  padding: 1px 8px;
+  border: 1px solid #bcd9cd;
+  border-radius: 999px;
+  background: #e8f3ee;
+  color: var(--ok);
+  font-family: inherit;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.profile-option:has(input:disabled) { cursor: not-allowed; opacity: 0.62; }
+.profile-option:has(input:disabled):hover { border-color: var(--line); background: var(--surface-solid); transform: none; box-shadow: none; }
+
+.verified-note { margin: 10px 0 0; color: var(--ink-soft); font-size: 0.76rem; line-height: 1.6; }
+.verified-note strong { color: var(--ink); overflow-wrap: anywhere; }
+
+.role-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 22px 22px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-card), 0 30px 60px -30px rgb(8 28 42 / 55%);
+}
+
+.role-dialog::backdrop { background: rgb(8 28 42 / 45%); backdrop-filter: blur(3px); }
+.role-dialog[open] { animation: rise 260ms ease-out both; }
+.role-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.role-dialog h2 { margin: 0; font-size: 1.25rem; }
+
+.dialog-close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-solid);
+  color: var(--ink-soft);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dialog-close:hover:not(:disabled) { border-color: var(--teal); color: var(--teal); }
+.dialog-close:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
 .confirmation { min-height: 1.5em; color: var(--ok); font-weight: 650; }
 .confirmation:not(:empty) { animation: rise 320ms ease-out both; }
 

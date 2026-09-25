@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SecurityPanel from './SecurityPanel.jsx';
-import UniversityStatusPanel from './UniversityStatusPanel.jsx';
+import VerifyRoleDialog from './VerifyRoleDialog.jsx';
 import { SESSION_EXPIRED as EXPIRED, apiRequest, authRequest, isProfile } from './auth.js';
 
 // The server owns the list of values; this only adds copy and an icon for the ones we know.
@@ -41,6 +41,10 @@ export default function ProfilePanel({ session, onSignedOut }) {
   const [error, setError] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [verified, setVerified] = useState(null);
+  const [universityEmail, setUniversityEmail] = useState(null);
+  const [verificationAvailable, setVerificationAvailable] = useState(false);
+  const [verifying, setVerifying] = useState('');
   const busy = useRef(false);
   const lifecycle = useRef(null);
   const heading = useRef(null);
@@ -50,6 +54,9 @@ export default function ProfilePanel({ session, onSignedOut }) {
     setEmail(data.email);
     setOptions(data.profile_types);
     setSaved(data.profile_type);
+    setVerified(data.verified_affiliation);
+    setUniversityEmail(data.university_email);
+    setVerificationAvailable(data.verification_available);
     // A save in flight owns the selection; a background refresh must not overwrite it.
     if (!busy.current) setSelected(data.profile_type);
     setStatus('ready');
@@ -152,6 +159,65 @@ export default function ProfilePanel({ session, onSignedOut }) {
     }
   }
 
+  // Student and Staff open verification unless already proven; Visitor is always free.
+  function choose(value) {
+    setError('');
+    setConfirmation('');
+    if (value !== 'VISITOR' && value !== verified) {
+      setVerifying(value);
+      return;
+    }
+    setSelected(value);
+  }
+
+  async function refresh() {
+    const signal = lifecycle.current.signal;
+    try {
+      const { response, data } = await apiRequest('profile', { signal });
+      if (response.status === 401) {
+        onSignedOut(EXPIRED);
+        return false;
+      }
+      if (!response.ok || !isProfile(data)) throw new Error('Profile unavailable');
+      applyProfile(data);
+      return true;
+    } catch {
+      if (!signal.aborted) setError('We couldn’t refresh your profile. Check your connection.');
+      return false;
+    }
+  }
+
+  async function verifiedRole(label) {
+    setVerifying('');
+    if (await refresh()) setConfirmation(`Verified. Your affiliation is ${label}.`);
+  }
+
+  async function removeVerification() {
+    if (busy.current) return;
+    busy.current = true;
+    setPending(true);
+    setError('');
+    setConfirmation('');
+    const signal = lifecycle.current.signal;
+    try {
+      const { response } = await apiRequest('profile/verification', {
+        method: 'DELETE', signal, headers: { 'X-CSRFToken': token },
+      });
+      if (response.status === 401) {
+        onSignedOut(EXPIRED);
+        return;
+      }
+      if (!response.ok) throw new Error('Remove failed');
+    } catch {
+      if (!signal.aborted) setError('We couldn’t remove the verification. Please try again.');
+      return;
+    } finally {
+      busy.current = false;
+      setPending(false);
+    }
+    if (await refresh()) setConfirmation('Verification removed. Your affiliation is Visitor.');
+  }
+
   async function logout() {
     if (busy.current) return;
     busy.current = true;
@@ -192,7 +258,7 @@ export default function ProfilePanel({ session, onSignedOut }) {
     <section className="panel profile-panel" id="profile" aria-labelledby="profile-title">
       <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Your account</p>
       <h1 id="profile-title" tabIndex="-1" ref={heading}>Your campus profile</h1>
-      <p className="card-description">Change your affiliation at any time.</p>
+      <p className="card-description">Choose how you’re connected to SDU.</p>
 
       <div className="account-row">
         <span className="account-label">Signed in as</span>
@@ -219,27 +285,39 @@ export default function ProfilePanel({ session, onSignedOut }) {
                   style={{ '--stagger': `${index * 60}ms` }}>
                   <input type="radio" name="profile_type" value={option.value}
                     checked={selected === option.value}
-                    onChange={() => {
-                      setSelected(option.value);
-                      setError('');
-                      setConfirmation('');
-                    }} />
+                    disabled={option.value !== 'VISITOR' && option.value !== verified
+                      && !verificationAvailable}
+                    onChange={() => choose(option.value)} />
                   <span className="option-mark" aria-hidden="true" />
                   <span className="option-body">
                     <span className="option-title">
                       <OptionIcon value={option.value} />
                       {option.label}
+                      {option.value === verified && <span className="verified-badge">Verified</span>}
                     </span>
-                    <span className="option-text">{DETAILS[option.value]?.description}</span>
+                    <span className="option-text">
+                      {DETAILS[option.value]?.description}
+                      {option.value !== 'VISITOR' && option.value !== verified && (verificationAvailable
+                        ? ' Requires your SDU email.'
+                        : ' Verification isn’t available right now.')}
+                    </span>
                   </span>
                 </label>
               ))}
             </div>
           </fieldset>
           <p className="option-note">
-            Affiliation describes your relationship with the university. It does not grant
-            administrative access.
+            Student and Staff are confirmed with your SDU email; Visitor needs no verification.
+            Affiliation does not grant administrative access.
           </p>
+          {verified && (
+            <p className="verified-note">
+              Verified as {verified === 'STUDENT' ? 'Student' : 'Staff'} with{' '}
+              <strong>{universityEmail}</strong>.{' '}
+              <button type="button" className="secondary-button" disabled={pending}
+                onClick={removeVerification}>Remove verification</button>
+            </p>
+          )}
 
           <div className="form-message" role="alert">{error}</div>
           <button className={`submit-button${!pending && !dirty ? ' is-saved' : ''}`}
@@ -255,7 +333,10 @@ export default function ProfilePanel({ session, onSignedOut }) {
         </form>
       )}
 
-      <UniversityStatusPanel onSignedOut={onSignedOut} />
+      {verifying && (
+        <VerifyRoleDialog role={verifying} onClose={() => setVerifying('')}
+          onVerified={verifiedRole} onSignedOut={onSignedOut} />
+      )}
 
       <SecurityPanel onSignedOut={onSignedOut} />
 
