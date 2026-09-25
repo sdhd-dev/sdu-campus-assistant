@@ -1,5 +1,10 @@
 # US-06: university status by email code
 
+> Changed by [US-07](verified-roles.md): verification now sets the role, `start`
+> takes `{email, role}`, and the separate **University status** block is part of
+> the role picker. The code rules below are unchanged and now live in
+> `accounts/email_codes.py`.
+
 The profile gains a **University status** section. A user enters an address on an
 SDU domain, receives a 6-digit code, and enters it. The account is then marked
 **Verified Student** or **Verified Staff** by the address's domain.

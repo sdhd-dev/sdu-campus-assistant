@@ -1,5 +1,8 @@
 # US-04: profile type selection
 
+> Since [US-07](verified-roles.md), Student and Staff require email verification;
+> only Visitor can be chosen freely. The API and checklist below note the changes.
+
 Signing in now opens a profile view instead of the previous signed-in panel. It
 shows the account email and offers **Student**, **Staff**, and **Visitor** as
 three native radio cards with a short description of each affiliation. The saved
@@ -15,7 +18,7 @@ session; the request body cannot name another user.
 | Endpoint | Behavior |
 | --- | --- |
 | `GET /api/profile/` | 200 with `email`, `profile_type`, `profile_types`, and `csrf_token` for an active authenticated user; otherwise 401 with `{"detail":"Authentication required."}`. |
-| `PATCH /api/profile/` | Requires the CSRF cookie and `X-CSRFToken`. Accepts exactly `{"profile_type": "STUDENT"}`, `"STAFF"`, or `"VISITOR"` and returns the same body as GET. |
+| `PATCH /api/profile/` | Requires the CSRF cookie and `X-CSRFToken`. Accepts exactly `{"profile_type": "STUDENT"}`, `"STAFF"`, or `"VISITOR"` and returns the same body as GET. Since US-07, STUDENT/STAFF must match the verified status (400 otherwise). |
 
 `profile_types` is the server's list of `{value, label}` options; the page renders
 those and never invents a value. Responses disable caching and contain no password,
@@ -95,16 +98,19 @@ engines, screen readers, and deployed HTTPS have not been verified.
 
 1. Sign in. Confirm the profile view shows your email and that a new account
    starts on **Visitor** with the button reading **Saved**.
-2. Choose **Student** and save. Confirm the pending state, then
-   `Saved. Your affiliation is Student.`
+2. Choose **Student**. Since US-07 this opens **Verify your role**; complete it
+   (see [US-07](verified-roles.md)) and confirm `Verified. Your affiliation is Student.`
 3. Refresh; confirm **Student** is still selected. Sign out, sign in again, and
    confirm it is still **Student**.
 4. Tab to the radio group and move with the arrow keys; confirm a visible focus
-   ring and that Space/Enter does not submit an unintended value.
+   ring and that Space/Enter does not submit an unintended value. Moving onto an
+   unverified Student or Staff opens the dialog; confirm focus moves into it and
+   returns after Escape.
 5. In DevTools, `PATCH /api/profile/` with `{"profile_type":"ADMIN"}` (400),
-   `{"profile_type":"STAFF","is_staff":true}` (400), and without `X-CSRFToken`
+   `{"profile_type":"STAFF","is_staff":true}` (400), `{"profile_type":"STAFF"}`
+   without a staff verification (400, since US-07), and without `X-CSRFToken`
    (403). Confirm the stored value did not change.
-6. Set a profile to **Staff**, then confirm in pgAdmin or `psql` that `is_staff`
+6. Verify a profile as **Staff**, then confirm in pgAdmin or `psql` that `is_staff`
    and `is_superuser` are still `false` and that `/admin/` is not reachable.
 7. Delete the session cookie, then save; confirm the expiry notice and the return
    to sign-in. Use DevTools Offline mode while saving; confirm a clear error.
