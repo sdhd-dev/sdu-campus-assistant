@@ -1,9 +1,10 @@
 # US-05: Continue with Google and optional two-step verification
 
-> Since [US-08](email-two-factor.md), the main two-step method is a code sent to
-> the account email, and the authenticator app below is an optional extra. The
-> second step and the app's disable endpoint take `{method, code}`, recovery
-> codes come with the first method, and the lockout lives on the user.
+> Since [US-08](email-two-factor.md), two-step verification is a code sent to the
+> account email, and the second step takes `{method, code}`. The authenticator
+> app (TOTP) described below was **removed in [US-09](remove-authenticator.md)**:
+> its model, the `security/two-factor/setup|enable|disable` endpoints, and the
+> PyOTP and segno dependencies are gone. The Google parts of this guide still apply.
 
 Email and password registration and login are unchanged. Sign-in adds a
 **Continue with Google** button under the password form, and the profile gains a
@@ -117,5 +118,5 @@ a real Google sign-in needs a configured client ID and has not been run end to e
 3. Sign in with a password account whose email equals your Google email; confirm
    the 409 message, then connect Google from the profile and sign in with Google.
 4–5. Replaced by the [US-08 checklist](email-two-factor.md#manual-checklist):
-   two-step verification is turned on by email code, and the authenticator app is
-   set up separately.
+   two-step verification is turned on by email code; the authenticator app no
+   longer exists.
