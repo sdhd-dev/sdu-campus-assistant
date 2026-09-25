@@ -35,6 +35,7 @@ export default function GoogleButton({ onCredential, text = 'continue_with', sep
 
   useEffect(() => {
     const controller = new AbortController();
+    let observer = null;
     setState('loading');
     authRequest('google', { signal: controller.signal }).then(async ({ response, data }) => {
       if (!response.ok) throw new Error('Unavailable');
@@ -50,13 +51,27 @@ export default function GoogleButton({ onCredential, text = 'continue_with', sep
         ux_mode: 'popup',
         callback: ({ credential }) => handler.current(credential),
       });
-      google.accounts.id.renderButton(target.current, {
-        theme: 'outline', size: 'large', shape: 'pill', text, logo_alignment: 'left',
-        width: Math.min(400, Math.max(200, target.current.offsetWidth || 320)),
-      });
+      // Google's button has a fixed pixel width, so it is drawn again when its space changes.
+      let drawn = 0;
+      const draw = () => {
+        const node = target.current;
+        const width = Math.min(400, Math.max(200, node?.offsetWidth || 320));
+        if (!node || width === drawn) return;
+        drawn = width;
+        node.replaceChildren();
+        google.accounts.id.renderButton(node, {
+          theme: 'outline', size: 'large', shape: 'pill', text, logo_alignment: 'left', width,
+        });
+      };
+      draw();
+      observer = new ResizeObserver(draw);
+      observer.observe(target.current);
       setState('ready');
     }).catch(() => { if (!controller.signal.aborted) setState('error'); });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      observer?.disconnect();
+    };
   }, [attempt, text]);
 
   if (state === 'hidden') return null;
