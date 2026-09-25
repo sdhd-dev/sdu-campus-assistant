@@ -50,6 +50,7 @@ export function isVerification(data) {
     && ['STUDENT', 'STAFF', 'VISITOR'].includes(data.profile_type)
     && [null, 'STUDENT', 'STAFF'].includes(data.verified_affiliation)
     && text(data.university_email) && text(data.verified_at) && text(data.pending_email)
+    && [null, 'STUDENT', 'STAFF'].includes(data.pending_role ?? null)
     && Number.isInteger(data.resend_in) && data.resend_in >= 0
     && ['student_domains', 'staff_domains'].every((key) => Array.isArray(data[key])
       && data[key].every((domain) => typeof domain === 'string'));

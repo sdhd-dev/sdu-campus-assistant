@@ -67,7 +67,8 @@ export default function VerifyRoleDialog({ role, onClose, onVerified, onSignedOu
     return () => clearTimeout(timer);
   }, [wait]);
 
-  const stage = state?.pending_email ? 'code' : 'email';
+  // A code sent for the other role doesn't belong to this dialog; sending a new one replaces it.
+  const stage = state?.pending_email && state.pending_role === role ? 'code' : 'email';
   useEffect(() => { if (status === 'ready') field.current?.focus(); }, [stage, status]);
 
   async function send(path, body) {
