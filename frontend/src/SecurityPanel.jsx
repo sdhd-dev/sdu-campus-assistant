@@ -2,17 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import GoogleButton from './GoogleButton.jsx';
 import { SESSION_EXPIRED, authRequest, isSecurity } from './auth.js';
 
-const METHOD_LABELS = { email: 'Email code', totp: 'Authenticator app', recovery: 'Recovery code' };
+const METHOD_LABELS = { email: 'Email code', recovery: 'Recovery code' };
 
-// Sign-in methods and two-step verification, shown inside the profile. Email codes are the
-// main second step; the authenticator app is an optional extra. Recovery codes come with
-// whichever method is turned on first.
+// Sign-in methods and two-step verification, shown inside the profile. The second step is a
+// code sent to the account email; recovery codes come with it for when email can't be reached.
 export default function SecurityPanel({ onSignedOut }) {
   const [security, setSecurity] = useState(null);
   const [status, setStatus] = useState('loading');
-  // idle | email-on | email-off | totp-on | totp-off
+  // idle | email-on | email-off
   const [mode, setMode] = useState('idle');
-  const [setup, setSetup] = useState(null);
   const [codes, setCodes] = useState(null);
   const [code, setCode] = useState('');
   const [method, setMethod] = useState('email');
@@ -114,18 +112,13 @@ export default function SecurityPanel({ onSignedOut }) {
 
   function leave() {
     setMode('idle');
-    setSetup(null);
     setCode('');
     setError('');
   }
 
-  // Methods that can confirm turning something off, main one first.
+  // Methods that can confirm turning two-step verification off, main one first.
   function confirmMethods() {
-    return [
-      security.email_two_factor_enabled && 'email',
-      security.totp_enabled && 'totp',
-      security.recovery_codes_remaining > 0 && 'recovery',
-    ].filter(Boolean);
+    return ['email', security.recovery_codes_remaining > 0 && 'recovery'].filter(Boolean);
   }
 
   async function emailCode() {
@@ -139,35 +132,19 @@ export default function SecurityPanel({ onSignedOut }) {
     if (!security.email_code_pending) await emailCode();
   }
 
-  function startOff(target) {
-    setMode(target);
-    setMethod(confirmMethods()[0]);
+  function startOff() {
+    setMode('email-off');
+    setMethod('email');
     setCode('');
-  }
-
-  async function startTotp() {
-    const data = await send('security/two-factor/setup', { body: {} });
-    if (!data) return;
-    if (typeof data.secret !== 'string' || typeof data.qr_code !== 'string'
-      || !data.qr_code.startsWith('data:image/svg+xml')) {
-      setError('That didn’t work. Please try again.');
-      return;
-    }
-    setSetup({ secret: data.secret, qr: data.qr_code });
-    setMode('totp-on');
   }
 
   const PATHS = {
     'email-on': 'security/two-factor/email/enable',
     'email-off': 'security/two-factor/email/disable',
-    'totp-on': 'security/two-factor/enable',
-    'totp-off': 'security/two-factor/disable',
   };
   const DONE = {
     'email-on': 'Two-step verification is on. We’ll email you a code when you sign in.',
-    'email-off': 'Email codes are off.',
-    'totp-on': 'The authenticator app is on.',
-    'totp-off': 'The authenticator app is removed.',
+    'email-off': 'Two-step verification is off.',
   };
 
   async function submitCode(event) {
@@ -179,10 +156,8 @@ export default function SecurityPanel({ onSignedOut }) {
     setCode('');
     if (!data || !accept(data)) return;
     setMode('idle');
-    setSetup(null);
     if (Array.isArray(data.recovery_codes)) setCodes(data.recovery_codes);
-    setConfirmation(security.two_factor_enabled && !data.two_factor_enabled
-      ? 'Two-step verification is off.' : DONE[current]);
+    setConfirmation(DONE[current]);
   }
 
   if (status !== 'ready') {
@@ -205,8 +180,8 @@ export default function SecurityPanel({ onSignedOut }) {
   }
 
   const turningOff = mode.endsWith('-off');
-  const codeKind = turningOff ? method : mode.startsWith('email') ? 'email' : 'totp';
-  const codeForm = (target) => mode.startsWith(target) && (
+  const codeKind = turningOff ? method : 'email';
+  const codeForm = mode !== 'idle' && (
     <form onSubmit={submitCode} aria-busy={pending}>
       {turningOff && confirmMethods().length > 1 && (
         <fieldset className="method-choice">
@@ -250,7 +225,7 @@ export default function SecurityPanel({ onSignedOut }) {
       </div>
       <div className="security-actions">
         <button type="submit" className="ghost-button" disabled={pending || !code.trim()}>
-          {pending ? 'Checking…' : turningOff ? (target === 'totp' ? 'Remove' : 'Turn off') : 'Turn on'}
+          {pending ? 'Checking…' : turningOff ? 'Turn off' : 'Turn on'}
         </button>
         <button type="button" className="secondary-button" disabled={pending} onClick={leave}>
           Cancel
@@ -299,46 +274,11 @@ export default function SecurityPanel({ onSignedOut }) {
             ? <>Each sign-in asks for a code sent to <strong>{security.email}</strong>.</>
             : 'Optional. Get a 6-digit code by email every time you sign in, with Google too.'}
         </p>
-        {codeForm('email')}
+        {codeForm}
         {mode === 'idle' && !codes && (
           <button type="button" className="ghost-button" disabled={pending}
-            onClick={security.email_two_factor_enabled ? () => startOff('email-off') : startEmail}>
+            onClick={security.email_two_factor_enabled ? startOff : startEmail}>
             {security.email_two_factor_enabled ? 'Turn off…' : 'Turn on'}
-          </button>
-        )}
-      </div>
-
-      <div className="security-item">
-        <div className="security-head">
-          <p className="security-name">Authenticator app <span className="optional">optional</span></p>
-          <span className={`security-badge${security.totp_enabled ? ' is-on' : ''}`}>
-            {security.totp_enabled ? 'On' : 'Off'}
-          </span>
-        </div>
-        <p className="security-text">
-          {security.totp_enabled
-            ? 'You can sign in with a code from your authenticator app instead of email.'
-            : 'An extra way to pass two-step verification, useful when email is slow.'}
-        </p>
-        {mode === 'totp-on' && setup && (
-          <div className="two-factor-setup">
-            <ol className="setup-steps">
-              <li>Scan this QR code with an authenticator app such as Google Authenticator,
-                Microsoft Authenticator, or 1Password.</li>
-              <li>Enter the 6-digit code the app shows.</li>
-            </ol>
-            <img className="qr-code" src={setup.qr} width="180" height="180"
-              alt="QR code for adding SDU Campus Assistant to an authenticator app" />
-            <p className="setup-key">
-              Can’t scan? Enter this key: <code>{setup.secret.match(/.{1,4}/g).join(' ')}</code>
-            </p>
-          </div>
-        )}
-        {codeForm('totp')}
-        {mode === 'idle' && !codes && (
-          <button type="button" className="ghost-button" disabled={pending}
-            onClick={security.totp_enabled ? () => startOff('totp-off') : startTotp}>
-            {security.totp_enabled ? 'Remove…' : 'Set up'}
           </button>
         )}
       </div>
@@ -347,7 +287,7 @@ export default function SecurityPanel({ onSignedOut }) {
         <div className="recovery-codes">
           <p>
             <strong>Save these recovery codes now.</strong> Each one signs you in once if you
-            can’t get an email code or reach your authenticator. They won’t be shown again.
+            can’t get an email code. They won’t be shown again.
           </p>
           <ol>{codes.map((value) => <li key={value}><code>{value}</code></li>)}</ol>
           <button type="button" className="ghost-button" onClick={() => setCodes(null)}>

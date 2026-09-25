@@ -38,7 +38,7 @@ export function isProfile(data) {
 export function isSecurity(data) {
   return typeof data?.csrf_token === 'string' && Boolean(data.csrf_token)
     && ['google_available', 'google_linked', 'has_password', 'two_factor_enabled',
-      'email_two_factor_enabled', 'totp_enabled', 'email_code_pending']
+      'email_two_factor_enabled', 'email_code_pending']
       .every((key) => typeof data[key] === 'boolean')
     && typeof data.email === 'string' && Boolean(data.email)
     && Number.isInteger(data.recovery_codes_remaining) && Number.isInteger(data.email_resend_in);

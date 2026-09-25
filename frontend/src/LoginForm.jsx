@@ -4,7 +4,7 @@ import GoogleButton from './GoogleButton.jsx';
 import TwoFactorStep from './TwoFactorStep.jsx';
 import { authRequest, isSession } from './auth.js';
 
-const METHODS = ['email', 'totp', 'recovery'];
+const METHODS = ['email', 'recovery'];
 
 function isChallenge(data) {
   return data?.two_factor_required === true && typeof data.csrf_token === 'string' && Boolean(data.csrf_token)

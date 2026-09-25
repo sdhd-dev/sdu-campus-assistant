@@ -4,12 +4,11 @@ import { authRequest, isSession } from './auth.js';
 const EXPIRED = 'Your sign-in expired. Please sign in again.';
 const OTHER = {
   email: 'Email me a code',
-  totp: 'Use your authenticator app',
   recovery: 'Use a recovery code',
 };
 
 // The second sign-in step. The session stays anonymous until the server accepts a code.
-// Email codes are the main method; the authenticator app and recovery codes are fallbacks.
+// The code comes by email; a recovery code is the fallback.
 export default function TwoFactorStep({ challenge, onLogin, onCancel }) {
   const [token, setToken] = useState(challenge.csrf_token);
   const [method, setMethod] = useState(challenge.methods[0]);
@@ -110,9 +109,7 @@ export default function TwoFactorStep({ challenge, onLogin, onCancel }) {
     ? (sent
       ? <>We sent a 6-digit code to <strong>{challenge.email_hint}</strong>. It expires in 10 minutes.</>
       : <>Send a 6-digit code to <strong>{challenge.email_hint}</strong>.</>)
-    : recovery
-      ? 'Enter one of the recovery codes you saved when you turned on two-step verification.'
-      : 'Open your authenticator app and enter the 6-digit code for SDU Campus Assistant.';
+    : 'Enter one of the recovery codes you saved when you turned on two-step verification.';
 
   return (
     <section className="panel" id="login" aria-labelledby="two-factor-title">
@@ -122,7 +119,7 @@ export default function TwoFactorStep({ challenge, onLogin, onCancel }) {
       <form onSubmit={submit} aria-busy={pending}>
         <div className="form-field">
           <label htmlFor="two-factor-code">
-            {email ? 'Email code' : recovery ? 'Recovery code' : 'Authentication code'}
+            {email ? 'Email code' : 'Recovery code'}
           </label>
           <div className="input-wrap">
             <input id="two-factor-code" name="code" ref={input} required readOnly={pending}
