@@ -4,7 +4,8 @@ A university team project for campus navigation, room and faculty search, campus
 services, and student schedules. **US-01 provides the project and database
 foundation; US-02 adds email registration; US-03 adds session-based email login
 and logout; US-04 adds profile type selection; US-05 adds Continue with Google and optional
-two-step verification.** Campus features are not
+two-step verification; US-06 adds Student/Staff status verification by university
+email code.** Campus features are not
 implemented. Registration does not sign users in automatically. This is a first
 working version of Sprint 1, not a production-ready release.
 
@@ -158,6 +159,13 @@ connects Google to an existing account and turns optional two-step verification
 (authenticator app plus recovery codes) on or off. See the
 [US-05 guide](docs/google-and-two-factor.md) for setup, API, and security decisions.
 
+**University status** in the profile confirms Student or Staff with a one-time code
+sent to an SDU address, separately from the affiliation you choose yourself. It
+appears when `UNIVERSITY_STUDENT_DOMAINS` / `UNIVERSITY_STAFF_DOMAINS` are set; in
+development the code is printed in the Django terminal. See the
+[US-06 guide](docs/university-verification.md) for email setup (Gmail for demos),
+API, limits, and logging.
+
 Behind the account screens is a single photograph of the SDU main entrance,
 loaded once and never reloaded. Login, registration, and the profile are three
 crops of that one picture, and the crop moves smoothly between them. These are
@@ -206,7 +214,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 79 backend tests pass (`accounts` and `core`). Quick manual pass:
+All 101 backend tests pass (`accounts` and `core`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 
