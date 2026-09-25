@@ -4,8 +4,13 @@ import GoogleButton from './GoogleButton.jsx';
 import TwoFactorStep from './TwoFactorStep.jsx';
 import { authRequest, isSession } from './auth.js';
 
+const METHODS = ['email', 'totp', 'recovery'];
+
 function isChallenge(data) {
-  return data?.two_factor_required === true && typeof data.csrf_token === 'string' && Boolean(data.csrf_token);
+  return data?.two_factor_required === true && typeof data.csrf_token === 'string' && Boolean(data.csrf_token)
+    && Array.isArray(data.methods) && data.methods.length > 0
+    && data.methods.every((method) => METHODS.includes(method))
+    && typeof data.email_code_sent === 'boolean' && Number.isInteger(data.resend_in);
 }
 
 export default function LoginForm({ onLogin, notice }) {
@@ -17,7 +22,7 @@ export default function LoginForm({ onLogin, notice }) {
   const [setupError, setSetupError] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
-  const [challenge, setChallenge] = useState('');
+  const [challenge, setChallenge] = useState(null);
   const messageRef = useRef(null);
   const inFlight = useRef(false);
   const submission = useRef(null);
@@ -59,7 +64,7 @@ export default function LoginForm({ onLogin, notice }) {
         setMessage(text);
       } else if (isChallenge(data)) {
         setPassword('');
-        setChallenge(data.csrf_token);
+        setChallenge(data);
       } else {
         if (!isSession(data)) throw new Error('Sign-in failed');
         setPassword('');
@@ -90,8 +95,8 @@ export default function LoginForm({ onLogin, notice }) {
   }, [signIn]);
 
   if (challenge) {
-    return <TwoFactorStep token={challenge} onLogin={onLogin} onCancel={(text) => {
-      setChallenge('');
+    return <TwoFactorStep challenge={challenge} onLogin={onLogin} onCancel={(text) => {
+      setChallenge(null);
       setToken('');
       setAttempt((value) => value + 1);
       setMessage(text);

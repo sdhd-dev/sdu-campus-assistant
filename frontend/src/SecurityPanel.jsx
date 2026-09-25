@@ -2,14 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import GoogleButton from './GoogleButton.jsx';
 import { SESSION_EXPIRED, authRequest, isSecurity } from './auth.js';
 
-// Sign-in methods and optional two-step verification, shown inside the profile.
+const METHOD_LABELS = { email: 'Email code', totp: 'Authenticator app', recovery: 'Recovery code' };
+
+// Sign-in methods and two-step verification, shown inside the profile. Email codes are the
+// main second step; the authenticator app is an optional extra. Recovery codes come with
+// whichever method is turned on first.
 export default function SecurityPanel({ onSignedOut }) {
   const [security, setSecurity] = useState(null);
   const [status, setStatus] = useState('loading');
+  // idle | email-on | email-off | totp-on | totp-off
   const [mode, setMode] = useState('idle');
   const [setup, setSetup] = useState(null);
   const [codes, setCodes] = useState(null);
   const [code, setCode] = useState('');
+  const [method, setMethod] = useState('email');
+  const [wait, setWait] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -17,6 +24,11 @@ export default function SecurityPanel({ onSignedOut }) {
   const busy = useRef(false);
   const lifecycle = useRef(null);
   const codeInput = useRef(null);
+
+  const apply = useCallback((data) => {
+    setSecurity(data);
+    setWait(data.email_resend_in);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,16 +41,22 @@ export default function SecurityPanel({ onSignedOut }) {
         return;
       }
       if (!response.ok || !isSecurity(data)) throw new Error('Unavailable');
-      setSecurity(data);
+      apply(data);
       setStatus('ready');
     }).catch(() => { if (!controller.signal.aborted) setStatus('error'); });
     return () => controller.abort();
-  }, [onSignedOut, attempt]);
+  }, [apply, onSignedOut, attempt]);
 
-  useEffect(() => { if (mode !== 'idle') codeInput.current?.focus(); }, [mode]);
+  useEffect(() => {
+    if (wait <= 0) return undefined;
+    const timer = setTimeout(() => setWait((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [wait]);
+
+  useEffect(() => { if (mode !== 'idle') codeInput.current?.focus(); }, [mode, method]);
 
   // Every change goes through here: one request at a time, with session and CSRF recovery.
-  const send = useCallback(async (path, { method = 'POST', body } = {}) => {
+  const send = useCallback(async (path, { method: verb = 'POST', body } = {}) => {
     if (busy.current || !security) return null;
     busy.current = true;
     setPending(true);
@@ -47,7 +65,7 @@ export default function SecurityPanel({ onSignedOut }) {
     const signal = lifecycle.current.signal;
     try {
       const { response, data } = await authRequest(path, {
-        method, signal,
+        method: verb, signal,
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': security.csrf_token },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
@@ -60,6 +78,7 @@ export default function SecurityPanel({ onSignedOut }) {
         setError('Your security check changed. Please try again.');
         return null;
       }
+      if (isSecurity(data)) apply(data);
       if (!response.ok) {
         setError(typeof data?.detail === 'string' ? data.detail : 'That didn’t work. Please try again.');
         return null;
@@ -72,25 +91,25 @@ export default function SecurityPanel({ onSignedOut }) {
       busy.current = false;
       setPending(false);
     }
-  }, [onSignedOut, security]);
+  }, [apply, onSignedOut, security]);
 
-  function applySecurity(data) {
+  function accept(data) {
     if (!isSecurity(data)) {
       setError('That didn’t work. Please try again.');
       return false;
     }
-    setSecurity(data);
+    apply(data);
     return true;
   }
 
   const linkGoogle = useCallback(async (credential) => {
     const data = await send('security/google', { body: { credential } });
-    if (data && applySecurity(data)) setConfirmation('Google is connected. You can now continue with Google.');
+    if (data && accept(data)) setConfirmation('Google is connected. You can now continue with Google.');
   }, [send]);
 
   async function unlinkGoogle() {
     const data = await send('security/google', { method: 'DELETE' });
-    if (data && applySecurity(data)) setConfirmation('Google is disconnected.');
+    if (data && accept(data)) setConfirmation('Google is disconnected.');
   }
 
   function leave() {
@@ -100,7 +119,33 @@ export default function SecurityPanel({ onSignedOut }) {
     setError('');
   }
 
-  async function startSetup() {
+  // Methods that can confirm turning something off, main one first.
+  function confirmMethods() {
+    return [
+      security.email_two_factor_enabled && 'email',
+      security.totp_enabled && 'totp',
+      security.recovery_codes_remaining > 0 && 'recovery',
+    ].filter(Boolean);
+  }
+
+  async function emailCode() {
+    const data = await send('security/two-factor/email/code', { body: {} });
+    if (data) setConfirmation(data.detail);
+  }
+
+  async function startEmail() {
+    setMode('email-on');
+    setCode('');
+    if (!security.email_code_pending) await emailCode();
+  }
+
+  function startOff(target) {
+    setMode(target);
+    setMethod(confirmMethods()[0]);
+    setCode('');
+  }
+
+  async function startTotp() {
     const data = await send('security/two-factor/setup', { body: {} });
     if (!data) return;
     if (typeof data.secret !== 'string' || typeof data.qr_code !== 'string'
@@ -109,51 +154,111 @@ export default function SecurityPanel({ onSignedOut }) {
       return;
     }
     setSetup({ secret: data.secret, qr: data.qr_code });
-    setMode('enable');
+    setMode('totp-on');
   }
+
+  const PATHS = {
+    'email-on': 'security/two-factor/email/enable',
+    'email-off': 'security/two-factor/email/disable',
+    'totp-on': 'security/two-factor/enable',
+    'totp-off': 'security/two-factor/disable',
+  };
+  const DONE = {
+    'email-on': 'Two-step verification is on. We’ll email you a code when you sign in.',
+    'email-off': 'Email codes are off.',
+    'totp-on': 'The authenticator app is on.',
+    'totp-off': 'The authenticator app is removed.',
+  };
 
   async function submitCode(event) {
     event.preventDefault();
-    const enabling = mode === 'enable';
-    const data = await send(`security/two-factor/${enabling ? 'enable' : 'disable'}`, {
-      body: { code: code.trim() },
-    });
+    const turningOff = mode.endsWith('-off');
+    const body = turningOff ? { method, code: code.trim() } : { code: code.trim() };
+    const current = mode;
+    const data = await send(PATHS[current], { body });
     setCode('');
-    if (!data || !applySecurity(data)) return;
+    if (!data || !accept(data)) return;
     setMode('idle');
     setSetup(null);
-    if (enabling) {
-      setCodes(Array.isArray(data.recovery_codes) ? data.recovery_codes : []);
-      setConfirmation('Two-step verification is on.');
-    } else {
-      setConfirmation('Two-step verification is off.');
-    }
+    if (Array.isArray(data.recovery_codes)) setCodes(data.recovery_codes);
+    setConfirmation(security.two_factor_enabled && !data.two_factor_enabled
+      ? 'Two-step verification is off.' : DONE[current]);
   }
 
-  if (status === 'error') {
-    return (
-      <section className="security" aria-labelledby="security-title">
-        <h2 id="security-title" className="section-title">Sign-in and security</h2>
-        <div className="setup-error" role="alert">
-          <p>We couldn’t load your security settings.</p>
-          <button type="button" className="secondary-button"
-            onClick={() => setAttempt((value) => value + 1)}>Try again</button>
-        </div>
-      </section>
-    );
-  }
   if (status !== 'ready') {
     return (
       <section className="security" aria-labelledby="security-title">
         <h2 id="security-title" className="section-title">Sign-in and security</h2>
-        <p className="waiting-line" role="status">
-          <span className="waiting-dot" aria-hidden="true" />Loading security settings…
-        </p>
+        {status === 'error' ? (
+          <div className="setup-error" role="alert">
+            <p>We couldn’t load your security settings.</p>
+            <button type="button" className="secondary-button"
+              onClick={() => setAttempt((value) => value + 1)}>Try again</button>
+          </div>
+        ) : (
+          <p className="waiting-line" role="status">
+            <span className="waiting-dot" aria-hidden="true" />Loading security settings…
+          </p>
+        )}
       </section>
     );
   }
 
-  const recovery = mode === 'disable';
+  const turningOff = mode.endsWith('-off');
+  const codeKind = turningOff ? method : mode.startsWith('email') ? 'email' : 'totp';
+  const codeForm = (target) => mode.startsWith(target) && (
+    <form onSubmit={submitCode} aria-busy={pending}>
+      {turningOff && confirmMethods().length > 1 && (
+        <fieldset className="method-choice">
+          <legend>Confirm with</legend>
+          {confirmMethods().map((option) => (
+            <label key={option}>
+              <input type="radio" name="confirm-method" value={option} checked={method === option}
+                onChange={() => { setMethod(option); setCode(''); setError(''); }} />
+              {METHOD_LABELS[option]}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {codeKind === 'email' && (
+        <p className="security-text">
+          {security.email_code_pending
+            ? <>Enter the 6-digit code sent to <strong>{security.email}</strong>.</>
+            : <>We’ll send a 6-digit code to <strong>{security.email}</strong>.</>}{' '}
+          <button type="button" className="secondary-button" disabled={pending || wait > 0}
+            onClick={emailCode}>
+            {security.email_code_pending
+              ? (wait > 0 ? `Resend in ${wait}s` : 'Resend code')
+              : (wait > 0 ? `Send code in ${wait}s` : 'Send code')}
+          </button>
+        </p>
+      )}
+      <div className="form-field">
+        <label htmlFor="security-code">
+          {turningOff ? 'Verification code' : METHOD_LABELS[codeKind]}
+        </label>
+        <div className="input-wrap">
+          <input id="security-code" ref={codeInput} className="code-input" required
+            autoComplete="one-time-code" inputMode={codeKind === 'recovery' ? 'text' : 'numeric'}
+            maxLength={codeKind === 'recovery' ? 11 : 6} autoCapitalize="none" spellCheck={false}
+            readOnly={pending} value={code}
+            onChange={(event) => {
+              setCode(codeKind === 'recovery' ? event.target.value : event.target.value.replace(/\D/g, ''));
+              setError('');
+            }} />
+        </div>
+      </div>
+      <div className="security-actions">
+        <button type="submit" className="ghost-button" disabled={pending || !code.trim()}>
+          {pending ? 'Checking…' : turningOff ? (target === 'totp' ? 'Remove' : 'Turn off') : 'Turn on'}
+        </button>
+        <button type="button" className="secondary-button" disabled={pending} onClick={leave}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <section className="security" aria-labelledby="security-title" aria-busy={pending}>
       <h2 id="security-title" className="section-title">Sign-in and security</h2>
@@ -185,30 +290,37 @@ export default function SecurityPanel({ onSignedOut }) {
       <div className="security-item">
         <div className="security-head">
           <p className="security-name">Two-step verification</p>
-          <span className={`security-badge${security.two_factor_enabled ? ' is-on' : ''}`}>
-            {security.two_factor_enabled ? 'On' : 'Off'}
+          <span className={`security-badge${security.email_two_factor_enabled ? ' is-on' : ''}`}>
+            {security.email_two_factor_enabled ? 'On' : 'Off'}
           </span>
         </div>
         <p className="security-text">
-          {security.two_factor_enabled
-            ? `Sign-in asks for a code from your authenticator app. ${security.recovery_codes_remaining} of 10 recovery codes left.`
-            : 'Optional. Ask for a code from an authenticator app every time you sign in.'}
+          {security.email_two_factor_enabled
+            ? <>Each sign-in asks for a code sent to <strong>{security.email}</strong>.</>
+            : 'Optional. Get a 6-digit code by email every time you sign in, with Google too.'}
         </p>
-
-        {codes && (
-          <div className="recovery-codes">
-            <p>
-              <strong>Save these recovery codes now.</strong> Each one signs you in once if you
-              lose your phone. They won’t be shown again.
-            </p>
-            <ol>{codes.map((value) => <li key={value}><code>{value}</code></li>)}</ol>
-            <button type="button" className="ghost-button" onClick={() => setCodes(null)}>
-              I’ve saved them
-            </button>
-          </div>
+        {codeForm('email')}
+        {mode === 'idle' && !codes && (
+          <button type="button" className="ghost-button" disabled={pending}
+            onClick={security.email_two_factor_enabled ? () => startOff('email-off') : startEmail}>
+            {security.email_two_factor_enabled ? 'Turn off…' : 'Turn on'}
+          </button>
         )}
+      </div>
 
-        {mode === 'enable' && setup && (
+      <div className="security-item">
+        <div className="security-head">
+          <p className="security-name">Authenticator app <span className="optional">optional</span></p>
+          <span className={`security-badge${security.totp_enabled ? ' is-on' : ''}`}>
+            {security.totp_enabled ? 'On' : 'Off'}
+          </span>
+        </div>
+        <p className="security-text">
+          {security.totp_enabled
+            ? 'You can sign in with a code from your authenticator app instead of email.'
+            : 'An extra way to pass two-step verification, useful when email is slow.'}
+        </p>
+        {mode === 'totp-on' && setup && (
           <div className="two-factor-setup">
             <ol className="setup-steps">
               <li>Scan this QR code with an authenticator app such as Google Authenticator,
@@ -222,40 +334,32 @@ export default function SecurityPanel({ onSignedOut }) {
             </p>
           </div>
         )}
-
-        {mode !== 'idle' ? (
-          <form onSubmit={submitCode} aria-busy={pending}>
-            <div className="form-field">
-              <label htmlFor="security-code">
-                {recovery ? 'Authentication or recovery code' : 'Authentication code'}
-              </label>
-              <div className="input-wrap">
-                <input id="security-code" ref={codeInput} className="code-input" required
-                  autoComplete="one-time-code" inputMode={recovery ? 'text' : 'numeric'}
-                  maxLength={recovery ? 11 : 6} autoCapitalize="none" spellCheck={false}
-                  readOnly={pending} value={code}
-                  onChange={(event) => {
-                    setCode(recovery ? event.target.value : event.target.value.replace(/\D/g, ''));
-                    setError('');
-                  }} />
-              </div>
-            </div>
-            <div className="security-actions">
-              <button type="submit" className="ghost-button" disabled={pending || !code.trim()}>
-                {pending ? 'Checking…' : recovery ? 'Turn off' : 'Turn on'}
-              </button>
-              <button type="button" className="secondary-button" disabled={pending} onClick={leave}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : !codes && (
+        {codeForm('totp')}
+        {mode === 'idle' && !codes && (
           <button type="button" className="ghost-button" disabled={pending}
-            onClick={security.two_factor_enabled ? () => setMode('disable') : startSetup}>
-            {security.two_factor_enabled ? 'Turn off…' : 'Turn on'}
+            onClick={security.totp_enabled ? () => startOff('totp-off') : startTotp}>
+            {security.totp_enabled ? 'Remove…' : 'Set up'}
           </button>
         )}
       </div>
+
+      {codes && (
+        <div className="recovery-codes">
+          <p>
+            <strong>Save these recovery codes now.</strong> Each one signs you in once if you
+            can’t get an email code or reach your authenticator. They won’t be shown again.
+          </p>
+          <ol>{codes.map((value) => <li key={value}><code>{value}</code></li>)}</ol>
+          <button type="button" className="ghost-button" onClick={() => setCodes(null)}>
+            I’ve saved them
+          </button>
+        </div>
+      )}
+      {security.two_factor_enabled && !codes && (
+        <p className="security-text recovery-left">
+          {security.recovery_codes_remaining} of 10 recovery codes left.
+        </p>
+      )}
 
       <div className="form-message" role="alert">{error}</div>
       <p className="form-note confirmation" role="status">{confirmation || ' '}</p>

@@ -991,6 +991,22 @@ input[readonly] { background: var(--teal-50); color: var(--ink-soft); }
 .security-item .google-button { justify-content: flex-start; }
 
 .two-factor-setup { margin-bottom: 12px; }
+.optional {
+  margin-left: 6px;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.recovery-left { margin: 12px 0 0; }
+.two-factor-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; }
+
+.method-choice { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; padding: 0; border: 0; }
+.method-choice legend { width: 100%; margin-bottom: 6px; padding: 0; font-size: 0.78rem; font-weight: 650; }
+.method-choice label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer; }
+.method-choice input { width: auto; height: auto; accent-color: var(--teal); }
 .setup-steps { margin: 0 0 12px; padding-left: 20px; font-size: 0.8rem; line-height: 1.5; }
 .setup-steps li + li { margin-top: 4px; }
 .qr-code { display: block; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
