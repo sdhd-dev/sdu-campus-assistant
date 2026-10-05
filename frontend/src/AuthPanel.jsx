@@ -1,13 +1,31 @@
 import { useCallback, useEffect, useState } from 'react';
+import HomePanel, { SECTIONS, SectionPlaceholder } from './HomePanel.jsx';
 import LoginForm from './LoginForm.jsx';
 import ProfilePanel from './ProfilePanel.jsx';
 import RegistrationForm from './RegistrationForm.jsx';
 import { authRequest, isSession } from './auth.js';
 
+// Pages that only a signed-in person may see. Anyone else is sent to the login page.
+const PROTECTED = ['home', 'profile', ...SECTIONS.map((section) => section.hash)];
+
+function nameFromHash(hash) {
+  return hash.replace('#', '');
+}
+
+// A signed-in person lands on the home page unless the address names another page.
+function routeFromHash(hash) {
+  const name = nameFromHash(hash);
+  return PROTECTED.includes(name) ? name : 'home';
+}
+
 export default function AuthPanel({ onView }) {
   const [state, setState] = useState({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  const [page, setPage] = useState(window.location.hash === '#login' ? 'login' : 'register');
+  const [hash, setHash] = useState(window.location.hash);
+  const [page, setPage] = useState(() => {
+    const name = nameFromHash(window.location.hash);
+    return name === 'login' || PROTECTED.includes(name) ? 'login' : 'register';
+  });
   const [notice, setNotice] = useState('');
   // Stable callback keeps session checking attached for this component's lifetime.
   const signedOut = useCallback((message) => {
@@ -19,6 +37,7 @@ export default function AuthPanel({ onView }) {
 
   useEffect(() => {
     function navigate() {
+      setHash(window.location.hash);
       if (window.location.hash === '#login') setPage('login');
       if (window.location.hash === '#register') setPage('register');
     }
@@ -31,8 +50,14 @@ export default function AuthPanel({ onView }) {
     setState({ status: 'loading' });
     authRequest('me', { signal: controller.signal }).then(({ response, data }) => {
       if (controller.signal.aborted) return;
-      if (response.status === 401) setState({ status: 'anonymous' });
-      else {
+      if (response.status === 401) {
+        setState({ status: 'anonymous' });
+        // Someone who is not signed in opened a members-only address: show the login page.
+        if (PROTECTED.includes(nameFromHash(window.location.hash))) {
+          setPage('login');
+          window.location.hash = 'login';
+        }
+      } else {
         if (!response.ok || !isSession(data)) throw new Error('Session unavailable');
         setState({ status: 'authenticated', session: data });
       }
@@ -44,13 +69,22 @@ export default function AuthPanel({ onView }) {
   let content;
   if (state.status === 'authenticated') {
     view = 'profile';
-    content = <ProfilePanel session={state.session} onSignedOut={signedOut} />;
+    const route = routeFromHash(hash);
+    if (route === 'profile') {
+      content = <ProfilePanel session={state.session} onSignedOut={signedOut} />;
+    } else if (route === 'home') {
+      content = <HomePanel session={state.session} />;
+    } else {
+      const section = SECTIONS.find((item) => item.hash === route);
+      content = <SectionPlaceholder title={section.title} />;
+    }
   } else if (state.status === 'anonymous') {
     view = page;
     content = page === 'login'
       ? <LoginForm notice={notice} onLogin={(session) => {
         setNotice('');
         setState({ status: 'authenticated', session });
+        window.location.hash = 'home';
       }} />
       : <RegistrationForm />;
   } else {
@@ -75,6 +109,10 @@ export default function AuthPanel({ onView }) {
   // The camera follows navigation. Session checking and its error state hold
   // whichever viewpoint is already framed rather than adding a camera move.
   useEffect(() => { if (view) onView(view); }, [onView, view]);
+
+  if (import.meta.env.DEV && hash === '#preview-home') {
+    return <div id="authentication"><HomePanel session={{ email: 'student@sdu.edu.kz' }} /></div>;
+  }
 
   return <div id="authentication" tabIndex="-1" key={view || state.status}>{content}</div>;
 }
