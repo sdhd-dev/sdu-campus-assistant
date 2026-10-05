@@ -1,0 +1,84 @@
+/* Campus home page (Story 5). Uses the colours and radii defined in style.css. */
+
+.home-email { margin-bottom: 14px; }
+
+/* Search sits above the cards because finding a place is the main job here. */
+.home-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.home-search .submit-button { width: auto; margin-top: 0; padding-inline: 20px; }
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  height: 100%;
+  min-height: 118px;
+  padding: 14px 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-solid);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 170ms ease, background-color 170ms ease, transform 170ms ease;
+}
+
+.home-card:hover {
+  border-color: var(--teal-600);
+  background: var(--teal-50);
+  transform: translateY(-2px);
+}
+
+.home-card:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.home-card-icon {
+  width: 26px;
+  height: 26px;
+  margin-bottom: 4px;
+  color: var(--teal-600);
+}
+
+.home-card-title { font-weight: 700; font-size: 0.97rem; }
+.home-card-text { color: var(--ink-soft); font-size: 0.8rem; line-height: 1.45; }
+
+.home-footer { justify-content: flex-start; }
+
+.home-profile-link {
+  color: var(--teal-600);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.home-profile-link:hover { color: var(--teal); }
+
+/* On a narrow phone the cards stay two per row and drop the description, so all four fit on screen. */
+@media (max-width: 480px) {
+  .home-grid { gap: 10px; }
+  .home-card { min-height: 0; padding: 12px; }
+  .home-card-text { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-card { transition: none; }
+  .home-card:hover { transform: none; }
+}
+
+/* The heading takes keyboard focus when the page opens; it needs no outline. */
+.home-panel h1:focus-visible { outline: none; }
