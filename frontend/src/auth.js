@@ -1,9 +1,9 @@
 export const SESSION_EXPIRED = 'Your session has expired. Please sign in again.';
 
 // Session cookies stay in the browser; CSRF tokens live only in component state.
-export async function apiRequest(path, { signal, timeout = 15000, ...options } = {}) {
+export async function apiRequest(path, { signal, timeout = 15000, query, ...options } = {}) {
   const deadline = AbortSignal.timeout(timeout);
-  const response = await fetch(`/api/${path}/`, {
+  const response = await fetch(`/api/${path}/${query ? `?${query}` : ''}`, {
     ...options,
     credentials: 'same-origin',
     cache: 'no-store',
@@ -54,4 +54,8 @@ export function isVerification(data) {
     && Number.isInteger(data.resend_in) && data.resend_in >= 0
     && ['student_domains', 'staff_domains'].every((key) => Array.isArray(data[key])
       && data[key].every((domain) => typeof domain === 'string'));
+}
+
+export function searchRequest(query, page, options) {
+  return apiRequest('campus/search', { ...options, query: new URLSearchParams({ q: query, page }) });
 }

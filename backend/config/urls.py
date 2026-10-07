@@ -7,8 +7,10 @@ from accounts.views import (
     verification_cancel, verification_confirm, verification_start,
 )
 from core.views import health
+from campus.views import search
 
 urlpatterns = [
+    path("api/campus/search/", search, name="campus-search"),
     path("api/health/", health, name="health"),
     path("api/auth/register/", register, name="register"),
     path("api/auth/login/", login, name="login"),

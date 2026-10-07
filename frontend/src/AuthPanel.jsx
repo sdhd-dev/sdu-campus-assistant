@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import HomePanel, { SECTIONS, SectionPlaceholder } from './HomePanel.jsx';
+import SearchPanel from './SearchPanel.jsx';
 import LoginForm from './LoginForm.jsx';
 import ProfilePanel from './ProfilePanel.jsx';
 import RegistrationForm from './RegistrationForm.jsx';
@@ -9,7 +10,7 @@ import { authRequest, isSession } from './auth.js';
 const PROTECTED = ['home', 'profile', ...SECTIONS.map((section) => section.hash)];
 
 function nameFromHash(hash) {
-  return hash.replace('#', '');
+  return hash.replace(/^#/, '').split('?')[0];
 }
 
 // A signed-in person lands on the home page unless the address names another page.
@@ -74,6 +75,8 @@ export default function AuthPanel({ onView }) {
       content = <ProfilePanel session={state.session} onSignedOut={signedOut} />;
     } else if (route === 'home') {
       content = <HomePanel session={state.session} />;
+    } else if (route === 'search') {
+      content = <SearchPanel hash={hash} onSignedOut={signedOut} />;
     } else {
       const section = SECTIONS.find((item) => item.hash === route);
       content = <SectionPlaceholder title={section.title} />;

@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import './home.css';
+import { searchHash } from './SearchPanel.jsx';
 
-// Each card is a plain link to a section. The sections themselves are built in
-// later user stories, so for now they open a "coming soon" page.
+// Search is available; other sections remain placeholders.
 export const SECTIONS = [
   {
     hash: 'search',
@@ -73,13 +73,12 @@ export default function HomePanel({ session }) {
       <h1 id="home-title" tabIndex="-1" ref={heading}>Welcome back</h1>
       <p className="card-description home-email">{session.email}</p>
 
-      {/* The real search arrives in a later story; for now this opens the Search page. */}
       <form
         className="home-search"
         role="search"
         onSubmit={(event) => {
           event.preventDefault();
-          window.location.hash = 'search';
+          window.location.hash = searchHash(new FormData(event.currentTarget).get('q') || '');
         }}
       >
         <label className="sr-only" htmlFor="home-search-input">Search the campus</label>
@@ -87,7 +86,8 @@ export default function HomePanel({ session }) {
           id="home-search-input"
           type="search"
           name="q"
-          placeholder="Where do you want to go?"
+          placeholder="E204, Бочка A1, Блок E"
+          maxLength={80}
           autoComplete="off"
         />
         <button className="submit-button" type="submit">Search</button>

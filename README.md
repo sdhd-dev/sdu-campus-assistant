@@ -258,3 +258,16 @@ Production requires HTTPS, a WSGI/ASGI application server, static hosting for
 `frontend/dist`, and routing `/api/` to Django on the same origin. Vite's proxy is
 development-only; `vite preview` is not a production server. No production
 application server or deployment infrastructure is provisioned by this story.
+
+## Story 6: Room and Building Search
+
+Signed-in users can search from Home for a room, block, barrel alias or room name.
+Results show the block, room floor and recommended entrance, including provisional
+data and recommendation status. The query persists in the hash URL after refresh.
+No map or routing is implemented by this story.
+
+The prepared `campus` data app uses the existing PostgreSQL database. After
+starting the project database, run `python backend/manage.py migrate` and
+`python backend/manage.py seed_campus`. Repeating seed preserves manual edits.
+See [search setup, API and validation](docs/room-building-search.md) and
+[prepared inventory](docs/campus-data.md).
