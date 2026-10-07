@@ -121,9 +121,6 @@ export default function HomePanel({ session, onSignedOut }) {
 
       {catalog?.length > 0 && <section className="explore-campus" aria-labelledby="explore-title"><h2 id="explore-title">Explore campus</h2><ul>{catalog.map(item => <li key={`${item.type}-${item.id}`}><a href={`#${searchHash(item.type === 'room' ? item.name : `Block ${item.code}`)}`}>{item.type === 'room' ? item.name : `Block ${item.code}`}</a>{item.block?.faculty_name && <span>{item.block.faculty_name}</span>}</li>)}</ul></section>}
       <section className="planned-features"><h2>Planned features <small>Coming later</small></h2><a href="#services">Services</a> · <a href="#directory">Directory</a></section>
-      <div className="panel-footer home-footer">
-        <a className="home-profile-link" href="#profile">Your profile</a>
-      </div>
     </section>
   );
 }
