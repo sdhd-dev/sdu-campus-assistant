@@ -8,7 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from accounts.views import CSRFAuthentication, UNAUTHENTICATED
-from .models import Block, Entrance, Room
+from .models import Block, Entrance, Room, CampusPlace
 from .views import block_data, room_data, block_details
 
 
@@ -40,9 +40,23 @@ def location(request):
         return Response(UNAUTHENTICATED, status=401)
     kind = request.query_params.get("type", "")
     code = request.query_params.get("code", "").strip().upper()
-    if kind not in {"room", "block", "entrance"} or len(code) > 4:
+    if kind not in {"room", "block", "entrance", "place"} or len(code) > 4:
         return Response({"detail": "Choose a room ID, block code or entrance code."}, status=400)
     try:
+        if kind == "place":
+            from .places import places_queryset, place_data
+            raw_id = request.query_params.get("id", "")
+            if not re.fullmatch(r"[0-9]{1,10}", raw_id) or int(raw_id) < 1:
+                return Response({"detail": "A positive place ID is required."}, status=400)
+            place = places_queryset().get(pk=int(raw_id))
+            data = place_data(place)
+            element = place.map_element.split(":")
+            # Metadata is not a map binding. Never infer a highlight from the block.
+            result = map_data(data, block=element[1] if element[0] == "block" else None,
+                              barrel=element[1] if element[0] == "barrel" else None,
+                              entrance=element[1] if element[0] == "entrance" else None)
+            result["map"]["element"] = place.map_element
+            return Response(result)
         if kind == "room":
             raw_id = request.query_params.get("id", "")
             if not re.fullmatch(r"[0-9]{1,10}", raw_id) or int(raw_id) < 1:
@@ -66,7 +80,7 @@ def location(request):
         entry = Entrance.objects.get(code=code)
         return Response(map_data({"id": entry.pk, "type": "entrance", "code": entry.code,
                                   "name": entry.name, "description": entry.description}, entrance=entry.code))
-    except (Room.DoesNotExist, Block.DoesNotExist, Entrance.DoesNotExist):
+    except (Room.DoesNotExist, Block.DoesNotExist, Entrance.DoesNotExist, CampusPlace.DoesNotExist):
         return Response({"detail": "Location not found in the campus inventory."}, status=404)
     except DatabaseError:
         return Response({"detail": "Campus locations are temporarily unavailable. Please retry."}, status=503)

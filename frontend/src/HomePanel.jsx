@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { apiRequest, SESSION_EXPIRED } from './auth.js';
+import { useEffect, useRef, useState } from 'react';
 import './home.css';
 import { searchHash } from './SearchPanel.jsx';
 
@@ -6,7 +7,7 @@ import { searchHash } from './SearchPanel.jsx';
 export const SECTIONS = [
   {
     hash: 'search',
-    title: 'Search',
+    title: 'Find a place',
     text: 'Find a room, office, or laboratory.',
     icon: (
       <>
@@ -17,8 +18,8 @@ export const SECTIONS = [
   },
   {
     hash: 'map',
-    title: 'Campus map',
-    text: 'Browse the labelled buildings and floors.',
+    title: 'Explore campus map',
+    text: 'Explore campus blocks, entrances and lecture halls.',
     icon: (
       <>
         <path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4Z" />
@@ -62,7 +63,17 @@ function Icon({ children }) {
   );
 }
 
-export default function HomePanel({ session }) {
+export default function HomePanel({ session, onSignedOut }) {
+  const [catalog, setCatalog] = useState(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    apiRequest('campus/catalog', { signal: controller.signal }).then(({ response, data }) => {
+      if (controller.signal.aborted) return;
+      if (response.status === 401) { onSignedOut?.(SESSION_EXPIRED); return; }
+      if (response.ok) setCatalog(data.quick_places);
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [onSignedOut]);
   const heading = useRef(null);
   // Move keyboard focus to the heading when the page opens, like the profile page does.
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
@@ -70,8 +81,8 @@ export default function HomePanel({ session }) {
   return (
     <section className="panel home-panel" aria-labelledby="home-title">
       <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Campus home</p>
-      <h1 id="home-title" tabIndex="-1" ref={heading}>Welcome back</h1>
-      <p className="card-description home-email">{session.email}</p>
+      <h1 id="home-title" tabIndex="-1" ref={heading}>Where do you need to go?</h1>
+      <p className="card-description home-email">Find rooms, campus blocks and barrel halls.</p>
 
       <form
         className="home-search"
@@ -93,20 +104,23 @@ export default function HomePanel({ session }) {
         <button className="submit-button" type="submit">Search</button>
       </form>
 
+      <div className="quick-examples" aria-label="Search examples">{['E204', 'Barrel A1', 'Block F'].map(q => <a key={q} href={`#${searchHash(q)}`}>{q}</a>)}</div>
       <nav aria-label="Campus sections">
         <ul className="home-grid">
-          {SECTIONS.map((section) => (
+          {SECTIONS.filter(section => ['search', 'map'].includes(section.hash)).map((section) => (
             <li key={section.hash}>
               <a className="home-card" href={`#${section.hash}`}>
                 <Icon>{section.icon}</Icon>
                 <span className="home-card-title">{section.title}</span>
-                <span className="home-card-text">{section.text}</span>
+                <span className="home-card-text">{section.hash === 'search' ? 'Search rooms, blocks and barrel halls.' : 'Explore campus blocks, entrances and lecture halls.'}</span>
               </a>
             </li>
           ))}
         </ul>
       </nav>
 
+      {catalog?.length > 0 && <section className="explore-campus" aria-labelledby="explore-title"><h2 id="explore-title">Explore campus</h2><ul>{catalog.map(item => <li key={`${item.type}-${item.id}`}><a href={`#${searchHash(item.type === 'room' ? item.name : `Block ${item.code}`)}`}>{item.type === 'room' ? item.name : `Block ${item.code}`}</a>{item.block?.faculty_name && <span>{item.block.faculty_name}</span>}</li>)}</ul></section>}
+      <section className="planned-features"><h2>Planned features <small>Coming later</small></h2><a href="#services">Services</a> · <a href="#directory">Directory</a></section>
       <div className="panel-footer home-footer">
         <a className="home-profile-link" href="#profile">Your profile</a>
       </div>
@@ -121,9 +135,9 @@ export function SectionPlaceholder({ title }) {
 
   return (
     <section className="panel home-panel" aria-labelledby="soon-title">
-      <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Coming soon</p>
+      <p className="eyebrow"><span className="eyebrow-rule" aria-hidden="true" />Coming later</p>
       <h1 id="soon-title" tabIndex="-1" ref={heading}>{title}</h1>
-      <p className="card-description">This part of the assistant is still being built.</p>
+      <p className="card-description">This feature is planned and is not available yet.</p>
       <div className="panel-footer home-footer">
         <a className="home-profile-link" href="#home">← Back to home</a>
       </div>

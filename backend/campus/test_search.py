@@ -116,7 +116,7 @@ class SearchTests(TestCase):
 
     def test_related_data_does_not_issue_n_plus_one_queries(self):
         self.client.force_authenticate(self.user)
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(6):
             response = self.search('E', page_size=50)
         self.assertEqual(response.status_code, 200)
 

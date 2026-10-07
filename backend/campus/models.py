@@ -104,3 +104,61 @@ class Room(models.Model):
 
     def __str__(self):
         return self.code
+
+
+class CampusPlace(models.Model):
+    class Category(models.TextChoices):
+        LIBRARY = "LIBRARY", "Library"
+        OFFICE = "OFFICE", "Office"
+        HALL = "HALL", "Hall"
+        FOOD = "FOOD", "Food"
+        OTHER = "OTHER", "Other"
+
+    class Verification(models.TextChoices):
+        UNVERIFIED = "UNVERIFIED", "Unverified"
+        VERIFIED = "VERIFIED", "Verified"
+
+    slug = models.SlugField(max_length=80, unique=True, help_text="Stable identifier; keep unchanged after publication.")
+    name = models.CharField(max_length=160)
+    category = models.CharField(max_length=16, choices=Category.choices)
+    aliases = models.JSONField(default=list, blank=True)
+    description = models.TextField(blank=True, help_text="English description")
+    block = models.ForeignKey(Block, null=True, blank=True, on_delete=models.PROTECT)
+    floor = models.PositiveSmallIntegerField(null=True, blank=True, help_text="0 = basement; leave blank if unknown")
+    room = models.ForeignKey(Room, null=True, blank=True, on_delete=models.PROTECT)
+    recommended_entrance = models.ForeignKey(Entrance, null=True, blank=True, on_delete=models.PROTECT)
+    map_element = models.CharField(max_length=24, blank=True, help_text="Existing SVG element only: block:A–I, barrel:A–D, entrance:MAIN/G/I, canteen")
+    opening_hours = models.CharField(max_length=300, blank=True)
+    source = models.CharField(max_length=200, blank=True)
+    verification_status = models.CharField(max_length=16, choices=Verification.choices, default=Verification.UNVERIFIED)
+    verified_at = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["slug"]
+        constraints = [models.CheckConstraint(condition=models.Q(floor__isnull=True) | models.Q(floor__gte=0, floor__lte=4), name="campus_place_valid_floor")]
+
+    def clean(self):
+        super().clean()
+        if not isinstance(self.aliases, list) or any(not isinstance(a, str) or not a.strip() or len(a) > 160 for a in self.aliases):
+            raise ValidationError({"aliases": "Use a list of non-empty strings up to 160 characters."})
+        allowed = {"", "canteen", *[f"block:{c}" for c in "ABCDEFGHI"], *[f"barrel:{c}" for c in "ABCD"], *[f"entrance:{c}" for c in ("MAIN", "G", "I")]}
+        if self.map_element not in allowed:
+            raise ValidationError({"map_element": "Choose an existing map element."})
+        if self.floor is not None and not 0 <= self.floor <= 4:
+            raise ValidationError({"floor": "Use 0–4 or leave unknown."})
+        if self.room_id and ((self.block_id and self.block_id != self.room.block_id) or (self.floor is not None and self.floor != self.room.floor)):
+            raise ValidationError("Block and floor must agree with the linked room.")
+        effective_block = self.block or (self.room.block if self.room_id else None)
+        if self.map_element.startswith("block:") and effective_block and self.map_element != f"block:{effective_block.code}":
+            raise ValidationError({"map_element": "Map block must agree with the recorded block."})
+        if self.verification_status == self.Verification.VERIFIED and (not self.source.strip() or not self.verified_at):
+            raise ValidationError("Verified places require a source and verification date.")
+        if self.verification_status != self.Verification.VERIFIED and self.verified_at:
+            raise ValidationError({"verified_at": "Only verified records have a verification date."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name

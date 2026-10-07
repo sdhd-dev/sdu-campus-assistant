@@ -48,7 +48,7 @@ export default function App() {
           </p>
         </main>
         <footer className="site-footer">
-          <p className="footer-note">Sprint 1: accounts and profiles.</p>
+
           <ServiceStatus />
         </footer>
       </div>

@@ -36,7 +36,7 @@ def entrance_data(entrance, block, override=False):
         "name": entrance.name if entrance else None,
         "description": entrance.description if entrance else "",
         "status": "UNKNOWN" if override else block.recommendation_status,
-        "note": "Рекомендация для кабинета; статус пока не уточнён." if override
+        "note": "Room-specific recommendation; confidence not confirmed." if override
                 else block.recommendation_note,
     }
 
@@ -99,9 +99,9 @@ def search(request):
     alias_sql = NORMALIZED_SQL.format("a")
     rooms = Room.objects.select_related("block", "block__recommended_entrance", "recommended_entrance").annotate(
         normalized_name=RawSQL(NORMALIZED_SQL.format("campus_room.name"), [CYRILLIC_LOWER, CYRILLIC_UPPER]),
-        alias_exact=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(aliases) a WHERE "
+        alias_exact=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(campus_room.aliases) a WHERE "
                            + alias_sql + " = %s)", [CYRILLIC_LOWER, CYRILLIC_UPPER, query]),
-        alias_partial=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(aliases) a WHERE "
+        alias_partial=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(campus_room.aliases) a WHERE "
                              + alias_sql + " LIKE %s)", [CYRILLIC_LOWER, CYRILLIC_UPPER, pattern]),
     )
     room_filter = Q(block__code=block_code) if is_block else (
@@ -117,12 +117,21 @@ def search(request):
         rank=Case(When(code=block_code, then=Value(0)),
                   default=Value(1), output_field=IntegerField())).order_by("rank", "code")
     try:
-        count = rooms.count() + blocks.count()
+        from .places import places_queryset, place_data
+        places = places_queryset().annotate(
+            normalized_name=RawSQL(NORMALIZED_SQL.format("campus_campusplace.name"), [CYRILLIC_LOWER, CYRILLIC_UPPER]),
+            alias_exact=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(campus_campusplace.aliases) a WHERE " + alias_sql + " = %s)", [CYRILLIC_LOWER, CYRILLIC_UPPER, query]),
+            alias_partial=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(campus_campusplace.aliases) a WHERE " + alias_sql + " LIKE %s)", [CYRILLIC_LOWER, CYRILLIC_UPPER, pattern]),
+        ).filter(Q(normalized_name__contains=query) | Q(alias_partial=True) | Q(slug__iexact=raw.strip())).annotate(
+            rank=Case(When(Q(normalized_name=query) | Q(alias_exact=True) | Q(slug__iexact=raw.strip()), then=Value(0)), default=Value(1), output_field=IntegerField())
+        ).order_by("rank", "slug")
+        count = rooms.count() + blocks.count() + places.count()
         end = page * size
         # Each independently ordered source only needs its first `end` rows.
         # Sorting that bounded merge yields stable pagination across both types.
         matches = [(r.rank, r.code, "room", room_data(r)) for r in rooms[:end]]
         matches += [(b.rank, b.code, "block", block_data(b)) for b in blocks[:end]]
+        matches += [(p.rank, p.slug, "place", place_data(p)) for p in places[:end]]
         matches.sort(key=lambda item: item[:3])
         return Response({**empty, "count": count,
                          "next_page": page + 1 if count > end and page < MAX_PAGE else None,

@@ -17,19 +17,24 @@ function Result({ item }) {
   const room = item.type === 'room';
   const title = room
     ? (item.kind === 'BARREL' ? `${item.name.replace(/^Бочка\s+/i, 'Barrel ')} — ${item.code}` : `Room ${item.code}`)
-    : `Block ${item.code}`;
+    : item.type === 'place' ? item.name : `Block ${item.code}`;
   return <li className="search-result">
     <article aria-label={title}>
       <h2>{title}</h2>
-      <p className="search-location">Block {item.block.code}{room && ` · ${item.floor === 0 ? 'Basement' : `Floor ${item.floor}`}`}</p>
+      <p className="search-location">{item.block ? `Block ${item.block.code}` : 'Block not recorded'}{(room || item.type === 'place') && item.floor !== null && ` · ${item.floor === 0 ? 'Basement' : `Floor ${item.floor}`}`}</p>
       {room && item.name && item.name !== `Room ${item.code}` && item.name !== `Кабинет ${item.code}` && item.kind !== 'BARREL' && <p>{item.name}</p>}
+      {item.type === 'place' && item.floor === null && <p>Floor not recorded.</p>}
       <FacultyInfo block={item.block} />
       {room && <p>{kinds[item.kind] || kinds.UNKNOWN}</p>}
       <RoomDescription place={item} />
       <p><strong>Recommended entrance: </strong>{({MAIN: 'Main entrance', G: 'Entrance G', I: 'Entrance I'})[item.entrance.code] || 'not recorded'}</p>
+      {item.entrance.description && <p>{item.entrance.description}</p>}
+      {item.type === 'place' && <p>{item.opening_hours ? `Opening hours: ${item.opening_hours}` : 'Opening hours not recorded'}</p>}
+      {item.type === 'place' && item.provisional && <p className="search-note">Facility details require verification.</p>}
       {item.entrance.status !== 'USER_REPORTED' &&
         <p className="search-note">{statuses[item.entrance.status] || statuses.UNKNOWN}</p>}
-      <a className="map-result-link" href={`#/map?${new URLSearchParams(item.type === 'room' ? { type: 'room', id: String(item.id) } : { type: 'block', code: item.code })}`}>Show on map</a>
+      {(item.type !== 'place' || item.map_available) && <a className="map-result-link" href={`#/map?${new URLSearchParams(['room', 'place'].includes(item.type) ? { type: item.type, id: String(item.id) } : { type: 'block', code: item.code })}`}>Show on map</a>}
+      {item.type === 'place' && !item.map_available && <p>Map location not recorded.</p>}
     </article>
   </li>;
 }

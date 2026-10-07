@@ -10,7 +10,7 @@ export function FacultyInfo({ block }) {
 }
 
 export function RoomDescription({ place }) {
-  if (place.type !== 'room' || !place.description) return null;
+  if (!['room', 'place', 'entrance'].includes(place.type) || !place.description) return null;
   // Only the generated ordinary-room placeholder is omitted. Barrel and manual
   // descriptions remain visible as full text in both Search and Campus Map.
   if (place.kind !== 'BARREL' && place.description ===

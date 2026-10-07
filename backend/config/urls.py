@@ -1,4 +1,6 @@
 from django.urls import path
+from django.contrib import admin
+from campus.catalog_views import catalog
 
 from accounts.views import (
     current_user, google_link, google_sign_in, login, logout, profile, register, security,
@@ -11,6 +13,8 @@ from campus.views import search
 from campus.map_views import location, map_blocks
 
 urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/campus/catalog/", catalog, name="campus-catalog"),
     path("api/campus/blocks/", map_blocks, name="campus-blocks"),
     path("api/campus/location/", location, name="campus-location"),
     path("api/campus/search/", search, name="campus-search"),

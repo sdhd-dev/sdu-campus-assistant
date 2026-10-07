@@ -22,7 +22,7 @@ function FacultyLabel({ code, y, blocks }) {
   </text>;
 }
 
-export default function CampusMap({ block, entrance, barrel, blocks = [], onSelect }) {
+export default function CampusMap({ block, entrance, barrel, element, blocks = [], onSelect }) {
   function activate(event, type, code) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -52,7 +52,7 @@ export default function CampusMap({ block, entrance, barrel, blocks = [], onSele
  <g data-block="F" role="button" tabIndex={0} aria-label="Block F" aria-pressed={block === 'F'}
     onClick={() => onSelect('block', 'F')} onKeyDown={event => activate(event, 'block', 'F')}>
     <path className={`wing${block === 'F' ? ' selected' : ''}`} d="M160 495L335 480V575H160V542H310V517L160 531Z"/><text className="block-name" x="25" y="529">Block F</text><path className="partition" d="M190 493V528M220 490V524M250 487V522M280 485V518M190 542V575M220 542V575M250 542V575M280 542V575"/><FacultyLabel code="F" y={553} blocks={blocks}/></g>
- <path className="wing" d="M390 470H487V504L451 547V602H431V652L442 667 428 684H407V659H390Z"/>
+ <path className={`wing${element === 'canteen' ? ' selected' : ''}`} d="M390 470H487V504L451 547V602H431V652L442 667 428 684H407V659H390Z"/>
  <text x="402" y="538">Canteen</text><path className="partition" d="M390 605H431"/>
  <g data-block="E" role="button" tabIndex={0} aria-label="Block E" aria-pressed={block === 'E'}
     onClick={() => onSelect('block', 'E')} onKeyDown={event => activate(event, 'block', 'E')}>
@@ -61,10 +61,10 @@ export default function CampusMap({ block, entrance, barrel, blocks = [], onSele
  <g data-block="D" role="button" tabIndex={0} aria-label="Block D" aria-pressed={block === 'D'}
     onClick={() => onSelect('block', 'D')} onKeyDown={event => activate(event, 'block', 'D')}>
     <path className={`wing${block === 'D' ? ' selected' : ''}`} d="M160 825L335 810V900H160V868H310V846L160 860Z"/><text className="block-name" x="25" y="861">Block D</text><path className="partition" d="M190 822V856M220 820V853M250 817V850M280 815V847M190 868V900M220 868V900M250 868V900M280 868V900"/><FacultyLabel code="D" y={885} blocks={blocks}/></g>
- <circle className={`barrel${barrel === 'D' ? ' selected' : ''}`} data-barrel="D" cx="381" cy="696" r="27"/><text x="424" y="702">Barrel D</text>
- <circle className={`barrel${barrel === 'C' ? ' selected' : ''}`} data-barrel="C" cx="407" cy="775" r="31"/><text x="453" y="781">Barrel C</text>
- <circle className={`barrel${barrel === 'B' ? ' selected' : ''}`} data-barrel="B" cx="381" cy="844" r="27"/><text x="424" y="850">Barrel B</text>
- <circle className={`barrel${barrel === 'A' ? ' selected' : ''}`} data-barrel="A" cx="407" cy="906" r="31"/><text x="453" y="912">Barrel A</text>
+ <g role="button" tabIndex={0} aria-label="Barrel D" onClick={() => onSelect('barrel', 'D')} onKeyDown={event => activate(event, 'barrel', 'D')}><circle className={`barrel${barrel === 'D' ? ' selected' : ''}`} data-barrel="D" cx="381" cy="696" r="27"/><text x="424" y="702">Barrel D</text></g>
+ <g role="button" tabIndex={0} aria-label="Barrel C" onClick={() => onSelect('barrel', 'C')} onKeyDown={event => activate(event, 'barrel', 'C')}><circle className={`barrel${barrel === 'C' ? ' selected' : ''}`} data-barrel="C" cx="407" cy="775" r="31"/><text x="453" y="781">Barrel C</text></g>
+ <g role="button" tabIndex={0} aria-label="Barrel B" onClick={() => onSelect('barrel', 'B')} onKeyDown={event => activate(event, 'barrel', 'B')}><circle className={`barrel${barrel === 'B' ? ' selected' : ''}`} data-barrel="B" cx="381" cy="844" r="27"/><text x="424" y="850">Barrel B</text></g>
+ <g role="button" tabIndex={0} aria-label="Barrel A" onClick={() => onSelect('barrel', 'A')} onKeyDown={event => activate(event, 'barrel', 'A')}><circle className={`barrel${barrel === 'A' ? ' selected' : ''}`} data-barrel="A" cx="407" cy="906" r="31"/><text x="453" y="912">Barrel A</text></g>
  <g data-block="A" role="button" tabIndex={0} aria-label="Block A" aria-pressed={block === 'A'}
     onClick={() => onSelect('block', 'A')} onKeyDown={event => activate(event, 'block', 'A')}>
     <path className={`wing${block === 'A' ? ' selected' : ''}`} d="M55 939H75V925H134V940H154V1020H55Z"/><text x="65" y="981">Block A</text></g>

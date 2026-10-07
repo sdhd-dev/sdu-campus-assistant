@@ -128,3 +128,5 @@ Room descriptions are visible through the same component as the map card. Search
 also matches stored faculty names and returns their block. The nested block object
 contains faculty_name and faculty_source for room and block results. See
 [campus-details.md](campus-details.md) for existing-database updates and provenance.
+
+CampusPlace facilities now participate in the same search and pagination; an unmapped facility has no Show on map action. See [demo/facilities API and import guide](campus-demo.md).
