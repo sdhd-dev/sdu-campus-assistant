@@ -49,3 +49,7 @@ main:has(.map-layout) > .viewpoint { display: none; }
 .map-panel button:disabled { opacity: .45; cursor: not-allowed; }
 
 .selected-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 6px; background: var(--sdu-active); border: 1px solid var(--sdu-text); vertical-align: middle; }
+
+.campus-map-svg .map-faculty-label { font-size: 12px; fill: var(--sdu-text); }
+.map-catalog-feedback { font-size: .83rem; color: var(--ink-soft); }
+@media (max-width: 650px) { .map-faculty-label { display: none; } }

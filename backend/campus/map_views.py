@@ -9,7 +9,7 @@ from rest_framework.response import Response
 
 from accounts.views import CSRFAuthentication, UNAUTHENTICATED
 from .models import Block, Entrance, Room
-from .views import block_data, room_data
+from .views import block_data, room_data, block_details
 
 
 def barrel_for(room):
@@ -70,3 +70,16 @@ def location(request):
         return Response({"detail": "Location not found in the campus inventory."}, status=404)
     except DatabaseError:
         return Response({"detail": "Campus locations are temporarily unavailable. Please retry."}, status=503)
+
+
+@never_cache
+@api_view(["GET"])
+@authentication_classes([CSRFAuthentication])
+@permission_classes([AllowAny])
+def map_blocks(request):
+    if not request.user.is_authenticated:
+        return Response(UNAUTHENTICATED, status=401)
+    try:
+        return Response({"blocks": [block_details(block) for block in Block.objects.all()]})
+    except DatabaseError:
+        return Response({"detail": "Building details are temporarily unavailable. Please retry."}, status=503)

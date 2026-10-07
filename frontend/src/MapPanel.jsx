@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { locationRequest, searchRequest, SESSION_EXPIRED } from './auth.js';
+import { apiRequest, locationRequest, searchRequest, SESSION_EXPIRED } from './auth.js';
 import CampusMap, { MAP_BLOCKS, MAP_ENTRANCES } from './map/CampusMap.jsx';
 import './map/map.css';
+import { FacultyInfo, RoomDescription } from './campus/PlaceDetails.jsx';
 
 const entryName = code => ({ MAIN: 'Main entrance', G: 'Entrance G', I: 'Entrance I' })[code] || (code ? `Entrance ${code}` : 'Entrance not recorded');
 export function mapHash(type, key) {
@@ -9,6 +10,7 @@ export function mapHash(type, key) {
 }
 const kindName = { CLASSROOM: 'Classroom', STAFF_OFFICE: 'Staff office', BARREL: 'Lecture hall', UNKNOWN: 'Room type not confirmed' };
 function placeTitle(place) {
+  if (place.kind === 'BARREL' && place.name) return `${place.name.replace(/^Бочка\s+/i, 'Barrel ')} — ${place.code}`;
   if (place.type === 'room') return `${place.map.barrel_code ? `Barrel ${place.map.barrel_label} — ` : ''}${place.code}`;
   return place.type === 'entrance' ? entryName(place.code) : `Block ${place.code}`;
 }
@@ -22,10 +24,23 @@ export default function MapPanel({ hash, onSignedOut }) {
   const [search, setSearch] = useState(null);
   const [searchAttempt, setSearchAttempt] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [buildings, setBuildings] = useState({ status: 'loading' });
+  const [buildingAttempt, setBuildingAttempt] = useState(0);
   const heading = useRef(null);
   const scroller = useRef(null);
   const searchController = useRef(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setBuildings({ status: 'loading' });
+    apiRequest('campus/blocks', { signal: controller.signal }).then(({ response, data }) => {
+      if (controller.signal.aborted) return;
+      if (response.status === 401) { onSignedOut(SESSION_EXPIRED); return; }
+      if (!response.ok || !Array.isArray(data.blocks)) throw new Error('Building details unavailable');
+      setBuildings({ status: 'ready', blocks: data.blocks });
+    }).catch(() => { if (!controller.signal.aborted) setBuildings({ status: 'error' }); });
+    return () => controller.abort();
+  }, [buildingAttempt, onSignedOut]);
   useEffect(() => {
     const controller = new AbortController();
     if (!parameterString) { setSelection({ status: 'empty' }); return () => controller.abort(); }
@@ -105,9 +120,13 @@ export default function MapPanel({ hash, onSignedOut }) {
         </div>
         <div className="map-scroll" ref={scroller} tabIndex="0" aria-label="Scrollable campus map">
           <div className="map-canvas" style={{ width: `min(${zoom * 100}%, calc(var(--map-fit-height) * ${zoom * 600 / 1100}))` }}>
-            <CampusMap block={mapped?.block_code} entrance={mapped?.entrance_code} barrel={mapped?.barrel_code} onSelect={choose} />
+            <CampusMap block={mapped?.block_code} entrance={mapped?.entrance_code} barrel={mapped?.barrel_code} blocks={buildings.blocks || []} onSelect={choose} />
           </div>
         </div>
+        {buildings.status === 'loading' && <p className="map-catalog-feedback" role="status">Loading building labels…</p>}
+        {buildings.status === 'error' && <div className="map-catalog-feedback" role="alert">
+          <p>Building labels unavailable.</p><button className="secondary-button" onClick={() => setBuildingAttempt(value => value + 1)}>Retry building labels</button>
+        </div>}
         <div className="map-legend"><span><i className="selected-swatch" aria-hidden="true" />Selected location</span><span>● Entrance</span></div>
         <div className="map-block-choices" role="group" aria-label="Select a block">
           {MAP_BLOCKS.map(code => <button key={code} className="secondary-button" aria-label={`Select Block ${code}`}
@@ -130,7 +149,9 @@ export default function MapPanel({ hash, onSignedOut }) {
             {mapped.block_code && `Block ${mapped.block_code} · `}
             {place.type === 'room' && `${place.floor === 0 ? 'Basement' : `Floor ${place.floor}`} · `}
             {entryName(mapped.entrance_code)}</p>
+          {!mapped.context_only && <FacultyInfo block={place.block} />}
           {place.type === 'room' && <p>{kindName[place.kind] || kindName.UNKNOWN}</p>}
+          <RoomDescription place={place} />
           {place.type === 'room' && place.provisional && <p className="map-notice">Provisional room record — existence requires verification.</p>}
           {place.type === 'room' && <p>Shown by building only. Room positions and floor plans are not available.</p>}
           {mapped.context_only && <p>Context building. Facility details and entrance recommendation are not confirmed.</p>}
@@ -145,7 +166,7 @@ export default function MapPanel({ hash, onSignedOut }) {
         </>}
       </aside>
     </div>
-    <p className="map-disclaimer">Schematic campus map · Not to scale. Library boundaries and Entrance I position require confirmation. Accounting Office and Red Hall locations are pending.</p>
+    <p className="map-disclaimer">Schematic campus map · Not to scale. Library boundaries and Entrance I position require confirmation. Accounting Office and Red Hall locations are pending. Red Canteen is not separately located on this schematic.</p>
     <div className="panel-footer home-footer"><a className="home-profile-link" href="#home">← Back to home</a></div>
   </section>;
 }

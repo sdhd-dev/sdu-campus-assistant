@@ -41,10 +41,15 @@ def entrance_data(entrance, block, override=False):
     }
 
 
+def block_details(block):
+    return {"id": block.pk, "code": block.code, "name": block.name,
+            "faculty_name": block.faculty_name, "faculty_source": block.faculty_source}
+
+
 def room_data(room):
     return {
         "id": room.pk, "type": "room", "code": room.code, "name": room.name,
-        "block": {"id": room.block_id, "code": room.block.code, "name": room.block.name},
+        "block": block_details(room.block),
         "floor": room.floor, "kind": room.kind, "description": room.description,
         "entrance": entrance_data(room.effective_entrance, room.block,
                                   override=room.recommended_entrance_id is not None),
@@ -56,7 +61,7 @@ def room_data(room):
 def block_data(block):
     return {
         "id": block.pk, "type": "block", "code": block.code, "name": block.name,
-        "block": {"id": block.pk, "code": block.code, "name": block.name},
+        "block": block_details(block),
         "description": block.recommendation_note,
         "entrance": entrance_data(block.recommended_entrance, block),
         "source": "", "provisional": True,
@@ -107,7 +112,8 @@ def search(request):
     ).order_by("rank", "code")
     blocks = Block.objects.select_related("recommended_entrance").annotate(
         normalized_name=RawSQL(NORMALIZED_SQL.format("campus_block.name"), [CYRILLIC_LOWER, CYRILLIC_UPPER]),
-    ).filter(Q(code=block_code) if is_block else Q(normalized_name__contains=query)).annotate(
+        normalized_faculty=RawSQL(NORMALIZED_SQL.format("campus_block.faculty_name"), [CYRILLIC_LOWER, CYRILLIC_UPPER]),
+    ).filter(Q(code=block_code) if is_block else (Q(normalized_name__contains=query) | Q(normalized_faculty__contains=query))).annotate(
         rank=Case(When(code=block_code, then=Value(0)),
                   default=Value(1), output_field=IntegerField())).order_by("rank", "code")
     try:

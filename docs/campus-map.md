@@ -141,3 +141,11 @@ No production database or existing pull request was merged during implementation
 
 Expired-session handling and anonymous direct `#/map` links with parameters were
 also checked in the browser and returned to sign-in.
+
+### Description and faculty follow-up
+
+Map selections now render full room descriptions and faculty metadata. Faculty
+labels come from the session-protected `/api/campus/blocks/` endpoint, with short
+block labels retained on mobile. Block has two additional schema fields for this
+follow-up; use [campus-details.md](campus-details.md) for the required migration
+and conservative update command for existing databases.

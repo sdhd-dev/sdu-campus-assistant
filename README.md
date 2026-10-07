@@ -228,7 +228,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 153 backend tests pass (`accounts`, `core`, and `campus`). Quick manual pass:
+All 161 backend tests pass (`accounts`, `core`, and `campus`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 
@@ -278,3 +278,12 @@ selected buildings, entrances and barrel halls, using the existing campus invent
 and effective room entrance. Selection persists in a session-protected hash URL.
 Keyboard selection, zoom/reset, mobile layout and retry states are included.
 See [map setup, API, SVG binding and limitations](docs/campus-map.md).
+
+## Updating barrel descriptions and faculty details
+
+For an existing project database, run `python backend/manage.py migrate` followed
+by `python backend/manage.py update_campus_details`. The updater translates only
+legacy/empty seed text and reports conflicts while preserving manual corrections.
+New installations receive the same approved English descriptions through seed.
+Search and map cards show faculty metadata and full descriptions from the backend.
+See [update policy, API and validation](docs/campus-details.md).

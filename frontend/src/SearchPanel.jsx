@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchRequest, SESSION_EXPIRED } from './auth.js';
 import './search.css';
+import { FacultyInfo, RoomDescription } from './campus/PlaceDetails.jsx';
 
 export function searchHash(query, page = 1) {
   const params = new URLSearchParams({ q: query.trim(), page: String(page) });
@@ -22,13 +23,12 @@ function Result({ item }) {
       <h2>{title}</h2>
       <p className="search-location">Block {item.block.code}{room && ` · ${item.floor === 0 ? 'Basement' : `Floor ${item.floor}`}`}</p>
       {room && item.name && item.name !== `Room ${item.code}` && item.name !== `Кабинет ${item.code}` && item.kind !== 'BARREL' && <p>{item.name}</p>}
+      <FacultyInfo block={item.block} />
       {room && <p>{kinds[item.kind] || kinds.UNKNOWN}</p>}
+      <RoomDescription place={item} />
       <p><strong>Recommended entrance: </strong>{({MAIN: 'Main entrance', G: 'Entrance G', I: 'Entrance I'})[item.entrance.code] || 'not recorded'}</p>
       {item.entrance.status !== 'USER_REPORTED' &&
         <p className="search-note">{statuses[item.entrance.status] || statuses.UNKNOWN}</p>}
-      {item.description && item.description !== item.entrance.note &&
-        item.description !== 'Предварительная запись по нумерации; проверить при сборе данных кампуса.' &&
-        <p>{item.description}</p>}
       <a className="map-result-link" href={`#/map?${new URLSearchParams(item.type === 'room' ? { type: 'room', id: String(item.id) } : { type: 'block', code: item.code })}`}>Show on map</a>
     </article>
   </li>;
