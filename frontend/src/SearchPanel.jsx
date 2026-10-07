@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchRequest, SESSION_EXPIRED } from './auth.js';
 import './search.css';
-import { FacultyInfo, RoomDescription } from './campus/PlaceDetails.jsx';
+import { FacultyInfo, RoomDescription, EntranceDescription } from './campus/PlaceDetails.jsx';
 
 export function searchHash(query, page = 1) {
   const params = new URLSearchParams({ q: query.trim(), page: String(page) });
@@ -28,7 +28,7 @@ function Result({ item }) {
       {room && <p>{kinds[item.kind] || kinds.UNKNOWN}</p>}
       <RoomDescription place={item} />
       <p><strong>Recommended entrance: </strong>{({MAIN: 'Main entrance', G: 'Entrance G', I: 'Entrance I'})[item.entrance.code] || 'not recorded'}</p>
-      {item.entrance.description && <p>{item.entrance.description}</p>}
+      <EntranceDescription description={item.entrance.description} />
       {item.type === 'place' && <p>{item.opening_hours ? `Opening hours: ${item.opening_hours}` : 'Opening hours not recorded'}</p>}
       {item.type === 'place' && item.provisional && <p className="search-note">Facility details require verification.</p>}
       {item.entrance.status !== 'USER_REPORTED' &&

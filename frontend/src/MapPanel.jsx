@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest, locationRequest, searchRequest, SESSION_EXPIRED } from './auth.js';
 import CampusMap, { MAP_BLOCKS, MAP_ENTRANCES } from './map/CampusMap.jsx';
 import './map/map.css';
-import { FacultyInfo, RoomDescription } from './campus/PlaceDetails.jsx';
+import { FacultyInfo, RoomDescription, EntranceDescription } from './campus/PlaceDetails.jsx';
 
 const entryName = code => ({ MAIN: 'Main entrance', G: 'Entrance G', I: 'Entrance I' })[code] || (code ? `Entrance ${code}` : 'Entrance not recorded');
 export function mapHash(type, key) {
@@ -177,7 +177,7 @@ export default function MapPanel({ hash, onSignedOut }) {
           {!mapped.context_only && <FacultyInfo block={place.block} />}
           {place.type === 'room' && <p>{kindName[place.kind] || kindName.UNKNOWN}</p>}
           <RoomDescription place={place} />
-          {place.entrance?.description && <p>{place.entrance.description}</p>}
+          <EntranceDescription description={place.entrance?.description} />
           {place.type === 'place' && <><p>Recommended entrance: {entryName(place.entrance?.code)}</p><p>{place.block ? `Block ${place.block.code}` : 'Block not recorded'} · {place.floor === null ? 'Floor not recorded' : place.floor === 0 ? 'Basement' : `Floor ${place.floor}`}</p><p>{place.opening_hours || 'Opening hours not recorded'}</p>{!place.map_available && <p>Map location not recorded.</p>}{place.provisional && <p>Facility details require verification.</p>}</>}
           {place.type === 'room' && place.provisional && <p className="map-notice">Provisional room record — existence requires verification.</p>}
           {place.type === 'room' && <p>Shown by building only. Room positions and floor plans are not available.</p>}

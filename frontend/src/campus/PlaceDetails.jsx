@@ -14,5 +14,11 @@ export function RoomDescription({ place }) {
   // descriptions remain visible as full text in both Search and Campus Map.
   if (place.kind !== 'BARREL' && place.description ===
       'Предварительная запись по нумерации; проверить при сборе данных кампуса.') return null;
+  if (place.type === 'entrance') return <EntranceDescription description={place.description} />;
   return <p className="room-description">{place.description}</p>;
+}
+
+export function EntranceDescription({ description }) {
+  if (!description || description === 'Entrance reported by the project team; exact coordinates have not been collected.') return null;
+  return <p>{description}</p>;
 }
