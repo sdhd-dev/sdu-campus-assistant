@@ -7,28 +7,29 @@ export function searchHash(query, page = 1) {
   return `search?${params}`;
 }
 
-const kinds = { CLASSROOM: 'Учебный кабинет', STAFF_OFFICE: 'Кабинет сотрудника',
-  BARREL: 'Лекционная аудитория', UNKNOWN: 'Тип помещения пока не уточнён' };
-const statuses = { PROVISIONAL: 'Предварительная рекомендация — требует проверки',
-  UNKNOWN: 'Статус рекомендации пока не уточнён' };
+const kinds = { CLASSROOM: 'Classroom', STAFF_OFFICE: 'Staff office',
+  BARREL: 'Lecture hall', UNKNOWN: 'Room type not confirmed' };
+const statuses = { PROVISIONAL: 'Provisional entrance recommendation — requires verification',
+  UNKNOWN: 'Entrance recommendation confidence is not confirmed' };
 
 function Result({ item }) {
   const room = item.type === 'room';
   const title = room
-    ? (item.kind === 'BARREL' ? `${item.name} — ${item.code}` : `Кабинет ${item.code}`)
-    : item.name;
+    ? (item.kind === 'BARREL' ? `${item.name.replace(/^Бочка\s+/i, 'Barrel ')} — ${item.code}` : `Room ${item.code}`)
+    : `Block ${item.code}`;
   return <li className="search-result">
     <article aria-label={title}>
       <h2>{title}</h2>
-      <p className="search-location">Блок {item.block.code}{room && ` · ${item.floor === 0 ? 'Подвал' : `${item.floor}-й этаж`}`}</p>
-      {room && item.name && item.name !== `Кабинет ${item.code}` && item.kind !== 'BARREL' && <p>{item.name}</p>}
+      <p className="search-location">Block {item.block.code}{room && ` · ${item.floor === 0 ? 'Basement' : `Floor ${item.floor}`}`}</p>
+      {room && item.name && item.name !== `Room ${item.code}` && item.name !== `Кабинет ${item.code}` && item.kind !== 'BARREL' && <p>{item.name}</p>}
       {room && <p>{kinds[item.kind] || kinds.UNKNOWN}</p>}
-      <p><strong>Рекомендуемый вход: </strong>{item.entrance.name || 'пока не указан'}</p>
+      <p><strong>Recommended entrance: </strong>{({MAIN: 'Main entrance', G: 'Entrance G', I: 'Entrance I'})[item.entrance.code] || 'not recorded'}</p>
       {item.entrance.status !== 'USER_REPORTED' &&
         <p className="search-note">{statuses[item.entrance.status] || statuses.UNKNOWN}</p>}
       {item.description && item.description !== item.entrance.note &&
         item.description !== 'Предварительная запись по нумерации; проверить при сборе данных кампуса.' &&
         <p>{item.description}</p>}
+      <a className="map-result-link" href={`#/map?${new URLSearchParams(item.type === 'room' ? { type: 'room', id: String(item.id) } : { type: 'block', code: item.code })}`}>Show on map</a>
     </article>
   </li>;
 }
@@ -50,8 +51,8 @@ export default function SearchPanel({ hash, onSignedOut }) {
     searchRequest(query, page, { signal: controller.signal }).then(({ response, data }) => {
       if (controller.signal.aborted) return;
       if (response.status === 401) { onSignedOut(SESSION_EXPIRED); return; }
-      if (!response.ok) throw new Error(data.detail || 'Не удалось выполнить поиск.');
-      if (!Array.isArray(data.results)) throw new Error('Некорректный ответ сервера.');
+      if (!response.ok) throw new Error('Please check your query and try again.');
+      if (!Array.isArray(data.results)) throw new Error('Invalid server response.');
       setState({ status: 'ready', data });
     }).catch((error) => {
       if (!controller.signal.aborted) setState({ status: 'error', message: error.message });
@@ -64,30 +65,30 @@ export default function SearchPanel({ hash, onSignedOut }) {
     if (window.location.hash === next) setAttempt(value => value + 1);
     else window.location.hash = next;
   }
-  return <section className="panel home-panel search-panel" lang="ru" aria-labelledby="search-title">
+  return <section className="panel home-panel search-panel" lang="en" aria-labelledby="search-title">
     <p className="eyebrow">Campus search</p>
-    <h1 id="search-title" ref={heading} tabIndex="-1">Поиск кабинета или блока</h1>
+    <h1 id="search-title" ref={heading} tabIndex="-1">Room and building search</h1>
     <form className="home-search" role="search" onSubmit={submit}>
-      <label className="sr-only" htmlFor="room-query">Кабинет, блок или название помещения</label>
+      <label className="sr-only" htmlFor="room-query">Room number, block or room name</label>
       <input id="room-query" type="search" maxLength={80} value={draft}
-        onChange={event => setDraft(event.target.value)} placeholder="E204, Бочка A1, Блок E" autoComplete="off" />
+        onChange={event => setDraft(event.target.value)} placeholder="E204, Barrel A1, Block E" autoComplete="off" />
       <button className="submit-button" type="submit">Search</button>
     </form>
     <div aria-live="polite" aria-busy={state.status === 'loading'}>
-      {state.status === 'empty' && <p>Введите номер кабинета, блок или название: например, E204 или Бочка A1.</p>}
-      {state.status === 'loading' && <p role="status">Ищем помещения…</p>}
-      {state.status === 'error' && <div role="alert"><p>Не удалось выполнить поиск. {state.message}</p>
-        <button className="secondary-button" onClick={() => setAttempt(value => value + 1)}>Повторить запрос</button></div>}
+      {state.status === 'empty' && <p>Enter a room number, block or name: for example, E204 or Barrel A1.</p>}
+      {state.status === 'loading' && <p role="status">Searching rooms…</p>}
+      {state.status === 'error' && <div role="alert"><p>Search unavailable. {state.message}</p>
+        <button className="secondary-button" onClick={() => setAttempt(value => value + 1)}>Retry search</button></div>}
       {state.status === 'ready' && <>
-        <p role="status">{state.data.count ? `Найдено: ${state.data.count}` : 'Ничего не найдено. Проверьте номер или попробуйте название блока.'}</p>
+        <p role="status">{state.data.count ? `Results: ${state.data.count}` : 'No results. Check the room number or try a block name.'}</p>
         <ul className="search-results">{state.data.results.map(item => <Result key={`${item.type}-${item.id}`} item={item} />)}</ul>
-        {(Number(page) > 1 || state.data.next_page) && <nav className="search-pagination" aria-label="Страницы результатов">
-          {Number(page) > 1 && <a href={`#${searchHash(query, Number(page) - 1)}`}>← Назад</a>}
-          <span>Страница {state.data.page}</span>
-          {state.data.next_page && <a href={`#${searchHash(query, state.data.next_page)}`}>Далее →</a>}
+        {(Number(page) > 1 || state.data.next_page) && <nav className="search-pagination" aria-label="Result pages">
+          {Number(page) > 1 && <a href={`#${searchHash(query, Number(page) - 1)}`}>← Previous</a>}
+          <span>Page {state.data.page}</span>
+          {state.data.next_page && <a href={`#${searchHash(query, state.data.next_page)}`}>Next →</a>}
         </nav>}
       </>}
     </div>
-    <div className="panel-footer home-footer"><a className="home-profile-link" href="#home">← На главную</a></div>
+    <div className="panel-footer home-footer"><a className="home-profile-link" href="#home">← Back to home</a></div>
   </section>;
 }

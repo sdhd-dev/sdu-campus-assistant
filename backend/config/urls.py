@@ -8,8 +8,10 @@ from accounts.views import (
 )
 from core.views import health
 from campus.views import search
+from campus.map_views import location
 
 urlpatterns = [
+    path("api/campus/location/", location, name="campus-location"),
     path("api/campus/search/", search, name="campus-search"),
     path("api/health/", health, name="health"),
     path("api/auth/register/", register, name="register"),

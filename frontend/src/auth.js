@@ -59,3 +59,7 @@ export function isVerification(data) {
 export function searchRequest(query, page, options) {
   return apiRequest('campus/search', { ...options, query: new URLSearchParams({ q: query, page }) });
 }
+
+export function locationRequest(params, options) {
+  return apiRequest('campus/location', { ...options, query: params });
+}
