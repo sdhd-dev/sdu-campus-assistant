@@ -5,7 +5,6 @@ export function FacultyInfo({ block }) {
   if (!block.faculty_name) return <p className="faculty-name">Faculty not confirmed</p>;
   return <div className="faculty-info">
     <p className="faculty-name">{block.faculty_name}</p>
-    {block.faculty_source && <p className="faculty-source">{block.faculty_source}</p>}
   </div>;
 }
 
