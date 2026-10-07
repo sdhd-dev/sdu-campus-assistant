@@ -114,3 +114,10 @@ tests also run alongside all existing account/core tests.
 A real network outage was not injected in the browser. Its error panel was checked
 using an API validation error; database failure handling is covered by backend
 fault-injection tests. No production database was accessed.
+
+### Card presentation update
+
+Cards omit team attribution, recommendation notes, generated-inventory boilerplate,
+provisional-inventory badges and source lines. Meaningful room descriptions (such
+as barrel locations) remain visible, as do provisional/unknown entrance confidence
+labels. All provenance and inventory flags remain available in the API/database.

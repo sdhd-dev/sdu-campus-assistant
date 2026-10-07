@@ -9,8 +9,7 @@ export function searchHash(query, page = 1) {
 
 const kinds = { CLASSROOM: 'Учебный кабинет', STAFF_OFFICE: 'Кабинет сотрудника',
   BARREL: 'Лекционная аудитория', UNKNOWN: 'Тип помещения пока не уточнён' };
-const statuses = { USER_REPORTED: 'По информации команды',
-  PROVISIONAL: 'Предварительная рекомендация — требует проверки',
+const statuses = { PROVISIONAL: 'Предварительная рекомендация — требует проверки',
   UNKNOWN: 'Статус рекомендации пока не уточнён' };
 
 function Result({ item }) {
@@ -25,11 +24,11 @@ function Result({ item }) {
       {room && item.name && item.name !== `Кабинет ${item.code}` && item.kind !== 'BARREL' && <p>{item.name}</p>}
       {room && <p>{kinds[item.kind] || kinds.UNKNOWN}</p>}
       <p><strong>Рекомендуемый вход: </strong>{item.entrance.name || 'пока не указан'}</p>
-      <p className="search-note">{statuses[item.entrance.status] || statuses.UNKNOWN}</p>
-      {item.entrance.note && <p className="search-note">{item.entrance.note}</p>}
-      {item.description && item.description !== item.entrance.note && <p>{item.description}</p>}
-      {item.provisional && <p className="search-badge">Предварительные данные — требуют проверки</p>}
-      {item.source && <p className="search-note">Источник: {item.source}</p>}
+      {item.entrance.status !== 'USER_REPORTED' &&
+        <p className="search-note">{statuses[item.entrance.status] || statuses.UNKNOWN}</p>}
+      {item.description && item.description !== item.entrance.note &&
+        item.description !== 'Предварительная запись по нумерации; проверить при сборе данных кампуса.' &&
+        <p>{item.description}</p>}
     </article>
   </li>;
 }

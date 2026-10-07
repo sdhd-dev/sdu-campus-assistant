@@ -4,7 +4,6 @@
 .search-result p { margin: 8px 0; line-height: 1.5; }
 .search-location { font-weight: 650; }
 .search-note { color: var(--ink-soft); font-size: .82rem; }
-.search-badge { padding: 8px 10px; border-radius: 8px; background: var(--teal-50); font-size: .82rem; }
 .search-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .search-pagination a { color: var(--teal-600); }
 @media (max-width: 480px) {
