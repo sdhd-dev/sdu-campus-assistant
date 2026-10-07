@@ -86,7 +86,7 @@ export default function HomePanel({ session }) {
           id="home-search-input"
           type="search"
           name="q"
-          placeholder="E204, Бочка A1, Блок E"
+          placeholder="E204, Barrel A1, Block E"
           maxLength={80}
           autoComplete="off"
         />

@@ -5,16 +5,9 @@ from campus.models import Block, Entrance, Room
 from campus.numbering import parse_room_code
 
 
-BARRELS = [
-    ("D117", "A1", "1-й этаж, первая от главного входа"),
-    ("D218", "A2", "2-й этаж, первая от главного входа"),
-    ("D116", "B1", "1-й этаж, вторая от главного входа"),
-    ("D217", "B2", "2-й этаж, вторая от главного входа"),
-    ("D113", "C1", "1-й этаж, третья, рядом с Advisor Desk"),
-    ("D214", "C2", "2-й этаж, третья, рядом с Advisor Desk"),
-    ("E117", "D1", "1-й этаж, четвёртая, рядом с Red Canteen"),
-    ("E221", "D2", "2-й этаж, четвёртая, рядом с Red Canteen"),
-]
+from campus.approved_details import BARREL_DETAILS, FACULTIES, FACULTY_SOURCE, update_approved_details
+
+BARRELS = [(code, alias, description) for code, alias, legacy, description in BARREL_DETAILS]
 
 
 def ordinary_room_codes():
@@ -32,6 +25,8 @@ class Command(BaseCommand):
         for order, code in enumerate("DEFGHI"):
             blocks[code], _ = Block.objects.get_or_create(code=code, defaults={
                 "name": f"Блок {code}", "horizontal_order": order,
+                "faculty_name": FACULTIES.get(code, ""),
+                "faculty_source": FACULTY_SOURCE if code in FACULTIES else "",
             })
         entrances = {}
         for code, name, block in [("MAIN", "Главный вход", None),
@@ -80,8 +75,9 @@ class Command(BaseCommand):
             _, block_code, floor = parse_room_code(code)
             _, new = Room.objects.get_or_create(code=code, defaults={
                 "block": blocks[block_code], "floor": floor, "kind": Room.Kind.BARREL,
-                "name": f"Бочка {alias}", "aliases": [alias, f"Бочка {alias}", f"Barrel {alias}"],
+                "name": f"Barrel {alias}", "aliases": [alias, f"Бочка {alias}", f"Barrel {alias}"],
                 "description": description, "source": "Список команды проекта, 2026-10-07",
             })
             created += int(new)
+        update_approved_details(self.stdout, self.stderr)
         self.stdout.write(self.style.SUCCESS(f"Campus seeded: {created} new rooms; existing records preserved."))

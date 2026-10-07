@@ -7,8 +7,7 @@ and logout; US-04 adds profile type selection; US-05 adds Continue with Google a
 two-step verification; US-06 adds Student/Staff status verification by university
 email code; US-07 makes Student and Staff selectable only after that verification;
 US-08 makes an email code the main two-step verification method; US-09 removes the
-authenticator app.** Campus features are not
-implemented. Registration does not sign users in automatically. This is a first
+authenticator app.** Room/building search (Story 6) and a schematic 2D campus map (Story 7) are implemented. Registration does not sign users in automatically. This is a first
 working version of Sprint 1, not a production-ready release.
 
 ## Structure
@@ -215,7 +214,7 @@ source .venv/bin/activate
 python backend/manage.py check
 python backend/manage.py migrate --check
 python backend/manage.py makemigrations --check --dry-run
-python backend/manage.py test accounts core --keepdb
+python backend/manage.py test accounts core campus --keepdb
 npm --prefix frontend run build
 curl --fail http://127.0.0.1:8000/api/health/
 curl --fail http://127.0.0.1:5173/api/health/
@@ -229,7 +228,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 123 backend tests pass (`accounts` and `core`). Quick manual pass:
+All 161 backend tests pass (`accounts`, `core`, and `campus`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 
@@ -271,3 +270,20 @@ starting the project database, run `python backend/manage.py migrate` and
 `python backend/manage.py seed_campus`. Repeating seed preserves manual edits.
 See [search setup, API and validation](docs/room-building-search.md) and
 [prepared inventory](docs/campus-data.md).
+
+## Story 7: 2D campus map
+
+Search results now offer **Show on map**. The approved schematic SVG highlights
+selected buildings, entrances and barrel halls, using the existing campus inventory
+and effective room entrance. Selection persists in a session-protected hash URL.
+Keyboard selection, zoom/reset, mobile layout and retry states are included.
+See [map setup, API, SVG binding and limitations](docs/campus-map.md).
+
+## Updating barrel descriptions and faculty details
+
+For an existing project database, run `python backend/manage.py migrate` followed
+by `python backend/manage.py update_campus_details`. The updater translates only
+legacy/empty seed text and reports conflicts while preserving manual corrections.
+New installations receive the same approved English descriptions through seed.
+Search and map cards show faculty metadata and full descriptions from the backend.
+See [update policy, API and validation](docs/campus-details.md).

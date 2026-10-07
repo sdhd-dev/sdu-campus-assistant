@@ -23,7 +23,7 @@ class CampusSeedTests(TestCase):
     def test_barrels_and_recommendations(self):
         self.seed()
         room = Room.objects.get(code="E221")
-        self.assertEqual(room.name, "Бочка D2")
+        self.assertEqual(room.name, "Barrel D2")
         self.assertEqual(room.floor, 2)
         self.assertEqual(room.block.code, "E")
         self.assertEqual(room.effective_entrance.code, "MAIN")

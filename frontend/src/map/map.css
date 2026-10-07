@@ -1,0 +1,55 @@
+#authentication.map-layout { max-width: 66rem; }
+main:has(.map-layout) { grid-template-columns: minmax(0, 1fr); }
+main:has(.map-layout) > .viewpoint { display: none; }
+.map-panel { --map-fit-height: 76vh; --sdu-bg: #f7f8fa; --sdu-panel: #fff; --sdu-text: #202c40; --sdu-line: #cbd4df; --sdu-wing: #e1e7ef; --sdu-active: #f4cf42; }
+.map-columns { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(230px, .75fr); gap: 24px; align-items: start; }
+.map-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.map-toolbar button { min-width: 44px; min-height: 44px; }
+.map-scroll { max-height: 76vh; overflow: auto; border: 1px solid var(--sdu-line); border-radius: 14px; background: var(--sdu-bg); }
+.map-canvas { margin-inline: auto; }
+.campus-map-svg { width: 100%; display: block; color: var(--sdu-text); }
+.campus-map-svg .wing { fill: var(--sdu-wing); stroke: var(--sdu-line); stroke-width: 1.5; }
+.campus-map-svg .corridor { fill: var(--sdu-panel); stroke: var(--sdu-line); stroke-width: 1.5; }
+.campus-map-svg .barrel { fill: var(--sdu-wing); stroke: var(--sdu-line); }
+.campus-map-svg .entry { fill: var(--sdu-text); }
+.campus-map-svg .partition { fill: none; stroke: var(--sdu-line); stroke-width: 1; }
+.campus-map-svg text { fill: var(--sdu-text); font-size: 18px; font-family: system-ui, sans-serif; pointer-events: none; }
+.campus-map-svg .block-name { font-weight: 600; }
+.campus-map-svg .selected { fill: var(--sdu-active); stroke: var(--sdu-text); stroke-width: 3; }
+.campus-map-svg [role=button] { cursor: pointer; }
+.campus-map-svg [role=button]:hover .wing { stroke: var(--sdu-text); stroke-width: 3; }
+.campus-map-svg [role=button]:focus-visible { outline: none; }
+.campus-map-svg [role=button]:focus-visible .wing,
+.campus-map-svg [role=button]:focus-visible .entry { stroke: #145877; stroke-width: 4; stroke-dasharray: 6 3; }
+.map-block-choices, .map-entry-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.map-block-choices button { min-width: 44px; min-height: 44px; }
+.map-panel button[aria-pressed=true] { background: var(--sdu-active); color: #29220d; border-color: var(--sdu-text); }
+.map-place { padding: 18px; border: 1px solid var(--sdu-line); border-radius: 14px; background: var(--sdu-panel); overflow-wrap: anywhere; position: sticky; top: 16px; }
+.map-place h2 { font-size: 1.25rem; margin: 0 0 12px; }
+.map-place p { line-height: 1.6; }
+.map-summary { font-weight: 650; }
+.map-notice { padding: 10px; background: #fff6d6; border-radius: 8px; font-size: .85rem; }
+.map-disclaimer, .map-legend, .map-search-feedback { font-size: .83rem; color: var(--ink-soft); line-height: 1.6; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; }
+.map-search-results { display: flex; gap: 8px; flex-wrap: wrap; list-style: none; padding: 0; max-height: 150px; overflow: auto; }
+.map-search-results a, .map-result-link { display: inline-block; padding: 10px 12px; color: var(--teal-600); border: 1px solid var(--line); border-radius: 9px; text-decoration: none; font-weight: 650; }
+.map-result-link { margin-top: 8px; }
+@media (max-width: 650px) {
+  .map-panel { --map-fit-height: 65vh; }
+  .map-columns { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .map-place { position: static; grid-row: 1; }
+  .map-scroll { max-height: 65vh; }
+}
+
+.map-toolbar .secondary-button, .map-block-choices .secondary-button, .map-entry-choices .secondary-button {
+  border: 1px solid var(--sdu-line); border-radius: 9px; background: var(--sdu-panel); color: var(--sdu-text); padding: 10px 14px; text-decoration: none;
+}
+.map-panel button[aria-pressed=true] { background: var(--sdu-active); border-color: var(--sdu-text); }
+
+.map-panel button:disabled { opacity: .45; cursor: not-allowed; }
+
+.selected-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 6px; background: var(--sdu-active); border: 1px solid var(--sdu-text); vertical-align: middle; }
+
+.campus-map-svg .map-faculty-label { font-size: 12px; fill: var(--sdu-text); }
+.map-catalog-feedback { font-size: .83rem; color: var(--ink-soft); }
+@media (max-width: 650px) { .map-faculty-label { display: none; } }

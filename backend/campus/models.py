@@ -36,6 +36,8 @@ class Block(models.Model):
 
     code = models.CharField(max_length=1, choices=Code.choices, unique=True)
     name = models.CharField(max_length=120)
+    faculty_name = models.CharField(max_length=200, blank=True)
+    faculty_source = models.CharField(max_length=200, blank=True)
     horizontal_order = models.PositiveSmallIntegerField(unique=True)
     recommended_entrance = models.ForeignKey(Entrance, null=True, blank=True,
                                              on_delete=models.SET_NULL,

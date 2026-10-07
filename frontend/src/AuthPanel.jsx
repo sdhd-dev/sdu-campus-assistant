@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import HomePanel, { SECTIONS, SectionPlaceholder } from './HomePanel.jsx';
 import SearchPanel from './SearchPanel.jsx';
+import MapPanel from './MapPanel.jsx';
 import LoginForm from './LoginForm.jsx';
 import ProfilePanel from './ProfilePanel.jsx';
 import RegistrationForm from './RegistrationForm.jsx';
@@ -10,7 +11,7 @@ import { authRequest, isSession } from './auth.js';
 const PROTECTED = ['home', 'profile', ...SECTIONS.map((section) => section.hash)];
 
 function nameFromHash(hash) {
-  return hash.replace(/^#/, '').split('?')[0];
+  return hash.replace(/^#\/?/, '').split('?')[0];
 }
 
 // A signed-in person lands on the home page unless the address names another page.
@@ -77,6 +78,8 @@ export default function AuthPanel({ onView }) {
       content = <HomePanel session={state.session} />;
     } else if (route === 'search') {
       content = <SearchPanel hash={hash} onSignedOut={signedOut} />;
+    } else if (route === 'map') {
+      content = <MapPanel hash={hash} onSignedOut={signedOut} />;
     } else {
       const section = SECTIONS.find((item) => item.hash === route);
       content = <SectionPlaceholder title={section.title} />;
@@ -117,5 +120,5 @@ export default function AuthPanel({ onView }) {
     return <div id="authentication"><HomePanel session={{ email: 'student@sdu.edu.kz' }} /></div>;
   }
 
-  return <div id="authentication" tabIndex="-1" key={view || state.status}>{content}</div>;
+  return <div id="authentication" className={state.status === 'authenticated' && routeFromHash(hash) === 'map' ? 'map-layout' : undefined} tabIndex="-1" key={view || state.status}>{content}</div>;
 }
