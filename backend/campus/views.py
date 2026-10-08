@@ -77,7 +77,7 @@ def search(request):
         return Response(UNAUTHENTICATED, status=401)
     raw = request.query_params.get("q", "")
     if len(raw) > MAX_QUERY_LENGTH:
-        return Response({"detail": "Запрос не должен превышать 80 символов."}, status=400)
+        return Response({"detail": "The query must not exceed 80 characters."}, status=400)
     try:
         page = int(request.query_params.get("page", "1"))
         size = int(request.query_params.get("page_size", "20"))
@@ -137,4 +137,4 @@ def search(request):
                          "next_page": page + 1 if count > end and page < MAX_PAGE else None,
                          "results": [item[3] for item in matches[(page - 1) * size:end]]})
     except DatabaseError:
-        return Response({"detail": "Поиск временно недоступен. Повторите запрос."}, status=503)
+        return Response({"detail": "Search is temporarily unavailable. Please retry."}, status=503)

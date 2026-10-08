@@ -7,6 +7,7 @@ from accounts.views import CSRFAuthentication, UNAUTHENTICATED
 from .models import Block, Room
 from .views import block_data, room_data
 from .map_views import barrel_for
+from .places import places_queryset, place_data
 
 @never_cache
 @api_view(["GET"])
@@ -18,6 +19,6 @@ def catalog(request):
     try:
         barrels = [dict(room_data(r), barrel_label=barrel_for(r)) for r in Room.objects.filter(kind="BARREL").select_related("block", "block__recommended_entrance", "recommended_entrance") if barrel_for(r)]
         blocks = [block_data(b) for b in Block.objects.filter(code__in=list("DEFG")).select_related("recommended_entrance")]
-        return Response({"barrels": barrels, "quick_places": [r for r in barrels if r["barrel_label"] == "A1"] + blocks})
+        return Response({"places": [place_data(p) for p in places_queryset().exclude(map_element="")], "barrels": barrels, "quick_places": [r for r in barrels if r["barrel_label"] == "A1"] + blocks})
     except DatabaseError:
         return Response({"detail": "Campus catalog unavailable."}, status=503)

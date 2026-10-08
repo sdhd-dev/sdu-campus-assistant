@@ -111,6 +111,7 @@ class CampusPlace(models.Model):
         LIBRARY = "LIBRARY", "Library"
         OFFICE = "OFFICE", "Office"
         HALL = "HALL", "Hall"
+        AUDITORIUM = "AUDITORIUM", "Auditorium"
         FOOD = "FOOD", "Food"
         OTHER = "OTHER", "Other"
 
@@ -128,6 +129,11 @@ class CampusPlace(models.Model):
     room = models.ForeignKey(Room, null=True, blank=True, on_delete=models.PROTECT)
     recommended_entrance = models.ForeignKey(Entrance, null=True, blank=True, on_delete=models.PROTECT)
     map_element = models.CharField(max_length=24, blank=True, help_text="Existing SVG element only: block:A–I, barrel:A–D, entrance:MAIN/G/I, canteen")
+    location = models.CharField(max_length=160, blank=True)
+    details = models.JSONField(default=list, blank=True)
+    photo = models.CharField(max_length=200, blank=True, help_text="Project asset path under /campus/places/")
+    photo_alt = models.CharField(max_length=200, blank=True)
+    map_note = models.CharField(max_length=300, blank=True)
     opening_hours = models.CharField(max_length=300, blank=True)
     source = models.CharField(max_length=200, blank=True)
     verification_status = models.CharField(max_length=16, choices=Verification.choices, default=Verification.UNVERIFIED)
@@ -141,7 +147,12 @@ class CampusPlace(models.Model):
         super().clean()
         if not isinstance(self.aliases, list) or any(not isinstance(a, str) or not a.strip() or len(a) > 160 for a in self.aliases):
             raise ValidationError({"aliases": "Use a list of non-empty strings up to 160 characters."})
-        allowed = {"", "canteen", *[f"block:{c}" for c in "ABCDEFGHI"], *[f"barrel:{c}" for c in "ABCD"], *[f"entrance:{c}" for c in ("MAIN", "G", "I")]}
+        if not isinstance(self.details, list) or any(not isinstance(d, str) or len(d) > 160 for d in self.details):
+            raise ValidationError({"details": "Use a list of short English strings."})
+        import re
+        if self.photo and (not re.fullmatch(r"/campus/places/[a-z0-9-]+\.(webp|jpg|png)", self.photo) or not self.photo_alt):
+            raise ValidationError({"photo": "Use a project photo path with English alt text."})
+        allowed = {"", "canteen", "library-area", "near-entrance:G", *[f"block:{c}" for c in "ABCDEFGHI"], *[f"barrel:{c}" for c in "ABCD"], *[f"entrance:{c}" for c in ("MAIN", "G", "I")]}
         if self.map_element not in allowed:
             raise ValidationError({"map_element": "Choose an existing map element."})
         if self.floor is not None and not 0 <= self.floor <= 4:

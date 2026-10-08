@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from campus.models import CampusPlace, Block, Entrance, Room
 
-FIELDS = {"slug", "name", "category", "aliases", "description", "block", "floor", "room", "recommended_entrance", "map_element", "opening_hours", "source", "verification_status", "verified_at"}
+FIELDS = {"slug", "name", "category", "aliases", "description", "block", "floor", "room", "recommended_entrance", "map_element", "opening_hours", "source", "verification_status", "verified_at", "location", "details", "photo", "photo_alt", "map_note"}
 
 class Command(BaseCommand):
     help = "Import verified campus places from version-1 JSON; atomic, dry-run, preserve differing manual data unless --update is explicitly supplied."
@@ -44,7 +44,7 @@ class Command(BaseCommand):
                     if not isinstance(values["verified_at"], str):
                         raise ValueError("Verification date must be YYYY-MM-DD")
                     values["verified_at"] = date.fromisoformat(values["verified_at"])
-                    for field in FIELDS - {"aliases", "floor", "block", "room", "recommended_entrance", "verified_at"}:
+                    for field in FIELDS - {"aliases", "details", "floor", "block", "room", "recommended_entrance", "verified_at"}:
                         if field in values and not isinstance(values[field], str):
                             raise ValueError(f"{field} must be text")
                     if "floor" in values and values["floor"] is not None and (type(values["floor"]) is not int):

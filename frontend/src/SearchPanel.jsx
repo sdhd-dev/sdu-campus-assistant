@@ -1,3 +1,4 @@
+import FacilityCard from './campus/FacilityCard.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { searchRequest, SESSION_EXPIRED } from './auth.js';
 import './search.css';
@@ -14,6 +15,7 @@ const statuses = { PROVISIONAL: 'Provisional entrance recommendation — require
   UNKNOWN: 'Entrance recommendation confidence is not confirmed' };
 
 function Result({ item }) {
+  if (item.type === 'place') return <li className="search-result"><FacilityCard place={item} /></li>;
   const room = item.type === 'room';
   const title = room
     ? (item.kind === 'BARREL' ? `${item.name.replace(/^Бочка\s+/i, 'Barrel ')} — ${item.code}` : `Room ${item.code}`)

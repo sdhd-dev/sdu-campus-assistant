@@ -9,8 +9,8 @@ Services and Directory are planned; their direct links explain this.
 No floor plans, routing, geolocation, 3D or staff directory are provided.
 Generated rooms still require an existence survey. G/I entrance recommendations
 and Entrance I position remain provisional. H uses Entrance G, between G and H.
-Library area is only a schematic annotation. Red Canteen is not synonymous with
-the entire Canteen shape. No records for future facilities are seeded.
+Library area has an approximate schematic binding; confirmed library/auditorium details are documented in [facilities](campus-facilities.md). Red Canteen is not synonymous with
+the entire Canteen shape. Only Library, Red Hall and Mini Red Hall have confirmed seeded facility records; other facilities await data.
 
 ## Update a local database
 
@@ -40,7 +40,7 @@ never grants admin rights. A superuser can add/edit Campus places, Room, Block a
 Entrance. The stable place slug is read-only after creation in admin.
 
 CampusPlace is separate from numbered Room. It stores a stable slug, name,
-category (LIBRARY/OFFICE/HALL/FOOD/OTHER), aliases, English description, optional
+category (LIBRARY/OFFICE/HALL/AUDITORIUM/FOOD/OTHER), aliases, English description, optional
 block/floor/Room/entrance, existing map binding, plain-text opening hours, source,
 verification status and verification date. Unknown fields stay blank/null; 0 means
 basement. A linked Room supplies missing block/floor; explicit values must agree.
@@ -90,7 +90,7 @@ without reviewing manual corrections.
 ## Binding to the schematic
 
 `map_element` is blank or one of `block:A` through `block:I`, `barrel:A` through
-`barrel:D`, `entrance:MAIN`, `entrance:G`, `entrance:I`, `canteen`.
+`barrel:D`, `entrance:MAIN`, `entrance:G`, `entrance:I`, `canteen`, `library-area`, `near-entrance:G`.
 Select an existing shape only when its association is checked. Metadata alone
 never creates a binding or a highlight. No coordinates are stored or invented.
 Block bindings must agree with explicit block metadata. A facility without a
@@ -140,3 +140,5 @@ permission separation, unmapped facilities, actual barrel catalog, descriptions,
 expired sessions and existing search/map behavior. Browser verification results
 are reported with the implementation; this document does not claim production
 readiness.
+
+For the three confirmed places, also run `python backend/manage.py seed_campus_places`; see [facility upgrade and photos](campus-facilities.md).

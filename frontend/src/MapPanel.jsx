@@ -1,3 +1,4 @@
+import FacilityCard from './campus/FacilityCard.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { apiRequest, locationRequest, searchRequest, SESSION_EXPIRED } from './auth.js';
 import CampusMap, { MAP_BLOCKS, MAP_ENTRANCES } from './map/CampusMap.jsx';
@@ -34,7 +35,7 @@ export default function MapPanel({ hash, onSignedOut }) {
       if (controller.signal.aborted) return;
       if (response.status === 401) { onSignedOut(SESSION_EXPIRED); return; }
       if (!response.ok || !Array.isArray(data.barrels)) throw new Error();
-      setBarrelCatalog({ status: 'ready', rooms: data.barrels });
+      setBarrelCatalog({ status: 'ready', rooms: data.barrels, places: data.places || [] });
     }).catch(() => { if (!controller.signal.aborted) setBarrelCatalog({ status: 'error' }); });
     return () => controller.abort();
   }, [catalogAttempt, onSignedOut]);
@@ -123,13 +124,13 @@ export default function MapPanel({ hash, onSignedOut }) {
         {!results.data.count && <p>No match in the campus inventory. Try E204 or Barrel D2.</p>}
         <ul className="map-search-results">{results.data.results.map(item => <li key={`${item.type}-${item.id}`}>
           {item.map_available === false ? <span>{item.name} · Map location not recorded</span> : <a href={`#${mapHash(item.type, ['room', 'place'].includes(item.type) ? item.id : item.code)}`}>
-            {item.type === 'block' ? `Block ${item.code}` : item.code} · Show on map
+            {item.type === 'block' ? `Block ${item.code}` : item.type === 'place' ? item.name : item.code} · Show on map
           </a>}
         </li>)}</ul>
         {results.data.next_page && <a href={`#search?${new URLSearchParams({q: search})}`}>View all search results</a>}
       </>}
     </div>
-    <div className="map-columns">
+    <div className={`map-columns${place?.type === 'place' ? ' facility-selection' : ''}`}>
       <div className="map-drawing">
         <div className="map-toolbar" role="group" aria-label="Map zoom controls">
           <button className="secondary-button" onClick={() => setZoom(value => Math.min(3, value + .5))} disabled={zoom >= 3} aria-label="Zoom in">+</button>
@@ -139,7 +140,7 @@ export default function MapPanel({ hash, onSignedOut }) {
         </div>
         <div className="map-scroll" ref={scroller} tabIndex="0" aria-label="Scrollable campus map">
           <div className="map-canvas" style={{ width: `min(${zoom * 100}%, calc(var(--map-fit-height) * ${zoom * 600 / 1100}))` }}>
-            <CampusMap element={mapped?.element} block={mapped?.block_code} entrance={mapped?.entrance_code} barrel={mapped?.barrel_code} blocks={buildings.blocks || []} onSelect={choose} />
+            <CampusMap places={barrelCatalog.places || []} element={mapped?.element} block={mapped?.block_code} entrance={mapped?.entrance_code} barrel={mapped?.barrel_code} blocks={buildings.blocks || []} onSelect={choose} />
           </div>
         </div>
         {buildings.status === 'loading' && <p className="map-catalog-feedback" role="status">Loading building labels…</p>}
@@ -157,6 +158,7 @@ export default function MapPanel({ hash, onSignedOut }) {
           {barrelCatalog.status === 'error' && <div role="alert"><p>Barrel halls unavailable.</p><button onClick={() => setCatalogAttempt(v => v + 1)}>Retry barrel halls</button></div>}
           {barrelCatalog.status === 'ready' && [1, 2].map(floor => { const rooms = barrelCatalog.rooms.filter(r => r.barrel_label === `${barrelChoice}${floor}`); return <div key={floor}>{rooms.length ? rooms.map(room => <button className="secondary-button" key={room.id} onClick={() => choose('room', room.id)}>{room.name} / Floor {room.floor}</button>) : <p>Barrel {barrelChoice}{floor}: record not available.</p>}</div>; })}
         </section>}
+        <div className="map-block-choices" role="group" aria-label="Select a campus facility">{(barrelCatalog.places || []).map(p => <button className="secondary-button" key={p.id} onClick={() => choose('place', p.id)}>{p.name}</button>)}</div>
         <div className="map-entry-choices" role="group" aria-label="Select an entrance">
           {MAP_ENTRANCES.map(code => <button key={code} className="secondary-button" aria-pressed={mapped?.entrance_code === code}
             onClick={() => choose('entrance', code)}>{entryName(code)}</button>)}
@@ -168,7 +170,8 @@ export default function MapPanel({ hash, onSignedOut }) {
         {selection.status === 'unknown' && <div role="alert"><h2>Unknown location</h2><p>{selection.message}</p><p>Select a recorded block or search again.</p></div>}
         {selection.status === 'error' && <div role="alert"><p>Location unavailable. Please try again.</p>
           <button className="secondary-button" onClick={() => setAttempt(value => value + 1)}>Retry location</button></div>}
-        {place && <>
+        {place?.type === 'place' && <FacilityCard place={place} />}
+        {place && place.type !== 'place' && <>
           <h2>{placeTitle(place)}</h2>
           <p className="map-summary">{place.type === 'room' && `${place.code} · `}
             {mapped.block_code && `Block ${mapped.block_code} · `}
@@ -193,7 +196,7 @@ export default function MapPanel({ hash, onSignedOut }) {
         </>}
       </aside>
     </div>
-    <p className="map-disclaimer">Schematic campus map · Not to scale. Library boundaries and Entrance I position require confirmation. Accounting Office and Red Hall locations are pending. Red Canteen is not separately located on this schematic.</p>
+    <p className="map-disclaimer">Schematic campus map · Not to scale. Library boundaries and Entrance I position require confirmation. Accounting Office location is pending. Auditorium positions and library boundaries are approximate. Red Canteen is not separately located on this schematic.</p>
     <div className="panel-footer home-footer"><a className="home-profile-link" href="#home">← Back to home</a></div>
   </section>;
 }

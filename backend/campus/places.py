@@ -11,6 +11,8 @@ def place_data(place):
     entry = place.recommended_entrance
     return {"id": place.pk, "type": "place", "code": place.slug, "name": place.name,
             "category": place.category, "description": place.description,
+            "location": place.location, "details": place.details, "photo": place.photo,
+            "photo_alt": place.photo_alt, "map_note": place.map_note,
             "block": block_details(block) if block else None,
             "floor": place.floor if place.floor is not None else (place.room.floor if place.room_id else None),
             "room_code": place.room.code if place.room_id else None,
