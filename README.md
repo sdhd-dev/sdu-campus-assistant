@@ -1,14 +1,8 @@
 # SDU Campus Assistant
 
-A university team project for campus navigation, room and faculty search, campus
-services, and student schedules. **US-01 provides the project and database
-foundation; US-02 adds email registration; US-03 adds session-based email login
-and logout; US-04 adds profile type selection; US-05 adds Continue with Google and optional
-two-step verification; US-06 adds Student/Staff status verification by university
-email code; US-07 makes Student and Staff selectable only after that verification;
-US-08 makes an email code the main two-step verification method; US-09 removes the
-authenticator app.** Room/building search (Story 6) and a schematic 2D campus map (Story 7) are implemented. Registration does not sign users in automatically. This is a first
-working version of Sprint 1, not a production-ready release.
+Ready: email/session accounts and profiles, room/block/barrel/facility search, and a schematic 2D campus map. Home highlights search and the map, with shared authenticated navigation.
+
+Planned: Services, Directory and additional facilities data. Generated room existence, some entrances and map annotations still require a campus survey. No routes or floor plans are provided. See [demo, database upgrades, admin, JSON import and survey checklist](docs/campus-demo.md).
 
 ## Structure
 
@@ -228,7 +222,7 @@ credentials, database names, server versions, or exception details. Registration
 GET request supplies a CSRF token and password instructions. The profile endpoint
 returns only the email, the saved affiliation, and the available options.
 
-All 161 backend tests pass (`accounts`, `core`, and `campus`). Quick manual pass:
+All 175 backend tests pass (`accounts`, `core`, and `campus`). Quick manual pass:
 register → sign in → choose an affiliation → **Save profile** → refresh →
 **Sign out** → sign in again and confirm the selection survived.
 
@@ -287,3 +281,7 @@ legacy/empty seed text and reports conflicts while preserving manual corrections
 New installations receive the same approved English descriptions through seed.
 Search and map cards show faculty metadata and full descriptions from the backend.
 See [update policy, API and validation](docs/campus-details.md).
+
+## Library and auditoriums
+
+Library, Red Hall and Mini Red Hall are available in search and the interactive map, with shared photo cards and approximate area explanations. Run `python backend/manage.py migrate` then `python backend/manage.py seed_campus_places`. See [facility data, photos and remaining unknowns](docs/campus-facilities.md).

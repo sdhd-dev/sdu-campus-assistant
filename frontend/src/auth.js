@@ -9,7 +9,11 @@ export async function apiRequest(path, { signal, timeout = 15000, query, ...opti
     cache: 'no-store',
     signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
   });
-  const data = response.status === 204 ? null : await response.json();
+  let data = null;
+  if (response.status !== 204) {
+    try { data = await response.json(); }
+    catch { throw new Error('Service temporarily unavailable. Please try again.'); }
+  }
   return { response, data };
 }
 

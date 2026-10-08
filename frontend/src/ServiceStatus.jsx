@@ -36,9 +36,9 @@ export default function ServiceStatus() {
   }, [attempt]);
 
   const statusText = {
-    loading: 'Checking backend connection…',
-    ok: 'Backend and database are online.',
-    error: 'Cannot reach a healthy backend. Check that Django and PostgreSQL are running.',
+    loading: 'Checking service…',
+    ok: 'Service available',
+    error: 'Service temporarily unavailable',
   };
 
   return (

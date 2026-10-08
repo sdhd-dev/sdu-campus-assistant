@@ -75,7 +75,7 @@ export default function AuthPanel({ onView }) {
     if (route === 'profile') {
       content = <ProfilePanel session={state.session} onSignedOut={signedOut} />;
     } else if (route === 'home') {
-      content = <HomePanel session={state.session} />;
+      content = <HomePanel session={state.session} onSignedOut={signedOut} />;
     } else if (route === 'search') {
       content = <SearchPanel hash={hash} onSignedOut={signedOut} />;
     } else if (route === 'map') {
@@ -84,6 +84,7 @@ export default function AuthPanel({ onView }) {
       const section = SECTIONS.find((item) => item.hash === route);
       content = <SectionPlaceholder title={section.title} />;
     }
+    content = <><nav className="campus-navigation" aria-label="Main navigation">{[['home', 'Home'], ['search', 'Search'], ['map', 'Campus Map'], ['profile', 'Profile']].map(([key, label]) => <a key={key} href={`#${key}`} aria-current={route === key ? 'page' : undefined}>{label}</a>)}</nav>{content}</>;
   } else if (state.status === 'anonymous') {
     view = page;
     content = page === 'login'

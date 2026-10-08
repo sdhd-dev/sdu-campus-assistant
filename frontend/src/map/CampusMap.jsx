@@ -22,7 +22,7 @@ function FacultyLabel({ code, y, blocks }) {
   </text>;
 }
 
-export default function CampusMap({ block, entrance, barrel, blocks = [], onSelect }) {
+export default function CampusMap({ block, entrance, barrel, element, places = [], blocks = [], onSelect }) {
   function activate(event, type, code) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -52,7 +52,7 @@ export default function CampusMap({ block, entrance, barrel, blocks = [], onSele
  <g data-block="F" role="button" tabIndex={0} aria-label="Block F" aria-pressed={block === 'F'}
     onClick={() => onSelect('block', 'F')} onKeyDown={event => activate(event, 'block', 'F')}>
     <path className={`wing${block === 'F' ? ' selected' : ''}`} d="M160 495L335 480V575H160V542H310V517L160 531Z"/><text className="block-name" x="25" y="529">Block F</text><path className="partition" d="M190 493V528M220 490V524M250 487V522M280 485V518M190 542V575M220 542V575M250 542V575M280 542V575"/><FacultyLabel code="F" y={553} blocks={blocks}/></g>
- <path className="wing" d="M390 470H487V504L451 547V602H431V652L442 667 428 684H407V659H390Z"/>
+ <path className={`wing${element === 'canteen' ? ' selected' : ''}`} d="M390 470H487V504L451 547V602H431V652L442 667 428 684H407V659H390Z"/>
  <text x="402" y="538">Canteen</text><path className="partition" d="M390 605H431"/>
  <g data-block="E" role="button" tabIndex={0} aria-label="Block E" aria-pressed={block === 'E'}
     onClick={() => onSelect('block', 'E')} onKeyDown={event => activate(event, 'block', 'E')}>
@@ -61,10 +61,10 @@ export default function CampusMap({ block, entrance, barrel, blocks = [], onSele
  <g data-block="D" role="button" tabIndex={0} aria-label="Block D" aria-pressed={block === 'D'}
     onClick={() => onSelect('block', 'D')} onKeyDown={event => activate(event, 'block', 'D')}>
     <path className={`wing${block === 'D' ? ' selected' : ''}`} d="M160 825L335 810V900H160V868H310V846L160 860Z"/><text className="block-name" x="25" y="861">Block D</text><path className="partition" d="M190 822V856M220 820V853M250 817V850M280 815V847M190 868V900M220 868V900M250 868V900M280 868V900"/><FacultyLabel code="D" y={885} blocks={blocks}/></g>
- <circle className={`barrel${barrel === 'D' ? ' selected' : ''}`} data-barrel="D" cx="381" cy="696" r="27"/><text x="424" y="702">Barrel D</text>
- <circle className={`barrel${barrel === 'C' ? ' selected' : ''}`} data-barrel="C" cx="407" cy="775" r="31"/><text x="453" y="781">Barrel C</text>
- <circle className={`barrel${barrel === 'B' ? ' selected' : ''}`} data-barrel="B" cx="381" cy="844" r="27"/><text x="424" y="850">Barrel B</text>
- <circle className={`barrel${barrel === 'A' ? ' selected' : ''}`} data-barrel="A" cx="407" cy="906" r="31"/><text x="453" y="912">Barrel A</text>
+ <g role="button" tabIndex={0} aria-label="Barrel D" onClick={() => onSelect('barrel', 'D')} onKeyDown={event => activate(event, 'barrel', 'D')}><circle className={`barrel${barrel === 'D' ? ' selected' : ''}`} data-barrel="D" cx="381" cy="696" r="27"/><text x="424" y="702">Barrel D</text></g>
+ <g role="button" tabIndex={0} aria-label="Barrel C" onClick={() => onSelect('barrel', 'C')} onKeyDown={event => activate(event, 'barrel', 'C')}><circle className={`barrel${barrel === 'C' ? ' selected' : ''}`} data-barrel="C" cx="407" cy="775" r="31"/><text x="453" y="781">Barrel C</text></g>
+ <g role="button" tabIndex={0} aria-label="Barrel B" onClick={() => onSelect('barrel', 'B')} onKeyDown={event => activate(event, 'barrel', 'B')}><circle className={`barrel${barrel === 'B' ? ' selected' : ''}`} data-barrel="B" cx="381" cy="844" r="27"/><text x="424" y="850">Barrel B</text></g>
+ <g role="button" tabIndex={0} aria-label="Barrel A" onClick={() => onSelect('barrel', 'A')} onKeyDown={event => activate(event, 'barrel', 'A')}><circle className={`barrel${barrel === 'A' ? ' selected' : ''}`} data-barrel="A" cx="407" cy="906" r="31"/><text x="453" y="912">Barrel A</text></g>
  <g data-block="A" role="button" tabIndex={0} aria-label="Block A" aria-pressed={block === 'A'}
     onClick={() => onSelect('block', 'A')} onKeyDown={event => activate(event, 'block', 'A')}>
     <path className={`wing${block === 'A' ? ' selected' : ''}`} d="M55 939H75V925H134V940H154V1020H55Z"/><text x="65" y="981">Block A</text></g>
@@ -72,7 +72,7 @@ export default function CampusMap({ block, entrance, barrel, blocks = [], onSele
  <path className="partition" d="M316 907V920H332V933H316V946H332V959H316"/>
  <g data-block="B" role="button" tabIndex={0} aria-label="Block B" aria-pressed={block === 'B'}
     onClick={() => onSelect('block', 'B')} onKeyDown={event => activate(event, 'block', 'B')}>
-    <path className={`wing${block === 'B' ? ' selected' : ''}`} d="M222 1023H286V1010H308V1043H335V1063H222Z"/><text x="235" y="1046">Block B</text><text x="219" y="1087">Library area *</text></g>
+    <path className={`wing${block === 'B' ? ' selected' : ''}`} d="M222 1023H286V1010H308V1043H335V1063H222Z"/><text x="235" y="1046">Block B</text>{!places.some(p => p.map_element === 'library-area') && <text x="219" y="1087">Library area *</text>}</g>
  <circle className="wing" cx="375" cy="1007" r="23"/>
  <path className="partition" d="M175 932H210M175 947H210M175 962H210M175 977H210M333 998L353 1018M338 993L358 1013"/>
  <g data-entry="I" role="button" tabIndex={0} aria-label="Entrance I" aria-pressed={entrance === 'I'}
@@ -84,6 +84,16 @@ export default function CampusMap({ block, entrance, barrel, blocks = [], onSele
  <g data-entry="MAIN" role="button" tabIndex={0} aria-label="Main entrance" aria-pressed={entrance === 'MAIN'}
     onClick={() => onSelect('entrance', 'MAIN')} onKeyDown={event => activate(event, 'entrance', 'MAIN')}>
     <circle className={`entry${entrance === 'MAIN' ? ' selected' : ''}`} cx="434" cy="1020" r="10"/><text x="383" y="1067">Main entrance</text></g>
- </svg>
+  {places.filter(p => ['library-area', 'block:A', 'near-entrance:G'].includes(p.map_element)).map(p => {
+    const position = { 'library-area': [220, 1080], 'block:A': [65, 1002], 'near-entrance:G': [405, 312] }[p.map_element];
+    return <g key={p.id} className="facility-marker" role="button" tabIndex={0} aria-label={p.name} aria-pressed={element === p.map_element}
+      onClick={() => onSelect('place', p.id)} onKeyDown={event => activate(event, 'place', p.id)}>
+      {p.map_element === 'library-area' && <ellipse pointerEvents="none" className={`facility-area${element === p.map_element ? ' selected' : ''}`} cx="278" cy="1045" rx="65" ry="31" />}
+      {p.map_element === 'near-entrance:G' && <ellipse pointerEvents="none" className={`facility-area${element === p.map_element ? ' selected' : ''}`} cx="390" cy="280" rx="34" ry="27" />}
+      <rect x={position[0]} y={position[1] - 15} width={p.map_element === 'near-entrance:G' ? 130 : 85} height="24" rx="6" />
+      <text x={position[0]+5} y={position[1]+1}>{p.name}</text>
+    </g>;
+ })}
+</svg>
   );
 }

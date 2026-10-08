@@ -68,11 +68,11 @@
 
 .home-profile-link:hover { color: var(--teal); }
 
-/* On a narrow phone the cards stay two per row and drop the description, so all four fit on screen. */
+/* Keep both working actions readable on narrow screens. */
 @media (max-width: 480px) {
   .home-grid { gap: 10px; }
   .home-card { min-height: 0; padding: 12px; }
-  .home-card-text { display: none; }
+  .home-card-text { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -82,3 +82,21 @@
 
 /* The heading takes keyboard focus when the page opens; it needs no outline. */
 .home-panel h1:focus-visible { outline: none; }
+
+.campus-navigation { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; padding:8px; border-radius:16px; background:var(--surface-solid); }
+.campus-navigation a { padding:8px 12px; border-radius:10px; color:var(--ink); text-decoration:none; }
+.campus-navigation a[aria-current="page"] { background:var(--teal-600); color:white; }
+.quick-examples { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 24px; }
+.quick-examples a { padding:6px 10px; border:1px solid var(--line); border-radius:20px; }
+.explore-campus { margin-top:24px; }
+.explore-campus h2, .planned-features h2 { font-size:1rem; }
+.explore-campus ul { list-style:none; padding:0; display:grid; gap:12px; }
+.explore-campus li { display:grid; gap:2px; }
+.explore-campus span { font-size:.8rem; color:var(--ink-soft); }
+.planned-features { margin-top:24px; padding-top:16px; border-top:1px solid var(--line); font-size:.9rem; }
+.planned-features small { font-weight:400; margin-left:10px; }
+.status-card { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px; }
+.status-card h2, .status-card p { margin:0; font-size:.8rem; }
+.barrel-chooser { margin:16px 0; padding:12px; border:1px solid var(--line); border-radius:12px; }
+.barrel-chooser h2 { font-size:1rem; }
+.barrel-chooser button { margin:4px; }

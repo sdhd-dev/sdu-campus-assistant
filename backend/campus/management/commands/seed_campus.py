@@ -80,4 +80,6 @@ class Command(BaseCommand):
             })
             created += int(new)
         update_approved_details(self.stdout, self.stderr)
+        from campus.entrance_details import update_entrances
+        update_entrances(self.stdout, self.stderr)
         self.stdout.write(self.style.SUCCESS(f"Campus seeded: {created} new rooms; existing records preserved."))

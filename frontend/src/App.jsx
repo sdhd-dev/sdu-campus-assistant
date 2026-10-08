@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import AuthPanel from './AuthPanel.jsx';
 import CampusPhoto from './campus/CampusPhoto.jsx';
-import ServiceStatus from './ServiceStatus.jsx';
-import { DEFAULT_VIEW, viewpointFor } from './campus/viewpoints.js';
-import useCalmMotion from './campus/useCalmMotion.js';
 
 export default function App() {
   // The photograph lives here, beside the shell, so moving between login,
@@ -11,9 +8,6 @@ export default function App() {
   const [view, setView] = useState(
     () => (window.location.hash === '#login' ? 'login' : 'register'),
   );
-  const calm = useCalmMotion();
-  // The caption names where the camera actually is, including when it is parked.
-  const place = viewpointFor(calm ? DEFAULT_VIEW : view);
 
   return (
     <>
@@ -36,21 +30,10 @@ export default function App() {
               <span>University team project</span>
             </span>
           </a>
-          <a className="status-link" href="#status-title">
-            Service status<span className="status-link-arrow" aria-hidden="true">↓</span>
-          </a>
         </header>
         <main>
           <AuthPanel onView={setView} />
-          <p className="viewpoint" key={place.place}>
-            <span className="viewpoint-place">{place.place}</span>
-            <span className="viewpoint-detail">{place.detail}</span>
-          </p>
         </main>
-        <footer className="site-footer">
-          <p className="footer-note">Sprint 1: accounts and profiles.</p>
-          <ServiceStatus />
-        </footer>
       </div>
     </>
   );
