@@ -152,17 +152,11 @@ export default function MapPanel({ hash, onSignedOut }) {
           {MAP_BLOCKS.map(code => <button key={code} className="secondary-button" aria-label={`Select Block ${code}`}
             aria-pressed={mapped?.block_code === code} onClick={() => choose('block', code)}>{code}</button>)}
         </div>
-        <div className="map-block-choices" role="group" aria-label="Select a barrel">{'ABCD'.split('').map(code => <button key={code} className="secondary-button" onClick={() => choose('barrel', code)}>Barrel {code}</button>)}</div>
         {barrelChoice && <section className="barrel-chooser" aria-label={`Choose floor for Barrel ${barrelChoice}`} aria-live="polite"><h2 ref={chooser} tabIndex="-1">Barrel {barrelChoice} · Choose a floor</h2>
           {barrelCatalog.status === 'loading' && <p role="status">Loading barrel halls…</p>}
           {barrelCatalog.status === 'error' && <div role="alert"><p>Barrel halls unavailable.</p><button onClick={() => setCatalogAttempt(v => v + 1)}>Retry barrel halls</button></div>}
           {barrelCatalog.status === 'ready' && [1, 2].map(floor => { const rooms = barrelCatalog.rooms.filter(r => r.barrel_label === `${barrelChoice}${floor}`); return <div key={floor}>{rooms.length ? rooms.map(room => <button className="secondary-button" key={room.id} onClick={() => choose('room', room.id)}>{room.name} / Floor {room.floor}</button>) : <p>Barrel {barrelChoice}{floor}: record not available.</p>}</div>; })}
         </section>}
-        <div className="map-block-choices" role="group" aria-label="Select a campus facility">{(barrelCatalog.places || []).map(p => <button className="secondary-button" key={p.id} onClick={() => choose('place', p.id)}>{p.name}</button>)}</div>
-        <div className="map-entry-choices" role="group" aria-label="Select an entrance">
-          {MAP_ENTRANCES.map(code => <button key={code} className="secondary-button" aria-pressed={mapped?.entrance_code === code}
-            onClick={() => choose('entrance', code)}>{entryName(code)}</button>)}
-        </div>
       </div>
       <aside className="map-place" aria-label="Selected location" aria-live="polite">
         {selection.status === 'empty' && <p>Select a block, entrance or search result to see its location.</p>}
