@@ -167,8 +167,10 @@ development the code is printed in the Django terminal. See the
 API, limits, and logging.
 
 Since US-07, choosing **Student** or **Staff** opens **Verify your role**, and the
-role changes only after a correct code from a matching SDU domain; **Visitor** is
-always available. Existing unverified Student/Staff accounts were reset to Visitor.
+role changes only after a correct code sent to a matching SDU address. Both roles
+use `sdu.edu.kz`: students verify with their student ID (`220103045@sdu.edu.kz`),
+staff with `name.surname@sdu.edu.kz`. **Visitor** is always available. Existing
+unverified Student/Staff accounts were reset to Visitor.
 See the [US-07 guide](docs/verified-roles.md).
 
 Behind the account screens is a single photograph of the SDU main entrance,

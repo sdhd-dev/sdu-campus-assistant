@@ -3,9 +3,9 @@
 Every account starts as **Visitor**. Choosing **Student** or **Staff** in the
 profile opens **Verify your role**: enter an SDU email, choose **Send code**,
 enter the code, then choose **Verify**. The role changes only when the server
-accepts the code, and only if the address's domain matches the role: a student
-domain gives Student, a staff domain gives Staff. Closing the dialog leaves the
-role unchanged.
+accepts the code, and only if the address matches the role (see
+[Student and Staff addresses](#student-and-staff-addresses)). Closing the dialog
+leaves the role unchanged.
 
 Other rules:
 - A verified role shows a **Verified** badge and can be chosen again at any time
@@ -18,6 +18,33 @@ one US-06 rule: verification now sets the role instead of leaving it alone. The
 code rules are still those of US-06, now in the shared `accounts/email_codes.py`
 module that US-08 also uses.
 
+## Student and Staff addresses
+
+SDU uses `sdu.edu.kz` for students and staff alike, so the domain cannot tell them
+apart. The part before `@` does:
+
+| Role | Address | Example |
+| --- | --- | --- |
+| Student | Student ID, digits only | `220103045@sdu.edu.kz` |
+| Staff | `name.surname`, Latin letters, exactly one dot | `aigerim.sadykova@sdu.edu.kz` |
+
+- The domain must still be one of the role's configured domains, so in production
+  set `sdu.edu.kz` in both `UNIVERSITY_STUDENT_DOMAINS` and
+  `UNIVERSITY_STAFF_DOMAINS`. A domain in both lists no longer stops the server.
+- The address is lower-cased before the check, so `Aigerim.Sadykova@SDU.edu.kz`
+  is accepted as Staff.
+- Both formats live in `LOCAL_PARTS` in `accounts/university.py`.
+  `affiliation_for_email()` uses them both when a code is requested and again on
+  confirm. The two formats never overlap, so an address proves at most one role.
+- Requesting Staff with any other address, such as `220103045@sdu.edu.kz`,
+  `aigerimsadykova@…`, `a.k.sadykova@…`, or another domain, returns 400 with
+  "Для сотрудника email должен быть в формате имя.фамилия@sdu.edu.kz".
+- The dialog runs the same Staff check before sending and shows
+  `name.surname@sdu.edu.kz` as the placeholder. The server still decides.
+- `affiliation_for_domain()` returns no role for a domain shared by both roles.
+  A future Google Workspace path (a verified `hd` claim) therefore cannot pick a
+  role from the domain alone.
+
 ## Rules enforced by the server
 
 - `PATCH /api/profile/` accepts `STUDENT` or `STAFF` only when the value matches
@@ -29,8 +56,9 @@ module that US-08 also uses.
   direct database write can store an unproven role.
 - `POST /api/profile/verification/start/` takes exactly `{"email", "role"}`.
   - `role` must be `STUDENT` or `STAFF`.
-  - An address on the other role's domain is refused with a message naming the
-    right role, e.g. "This is a staff address. Choose Staff to verify it."
+  - Staff requires `name.surname@` on a staff domain, as described above.
+  - A Staff address requested as Student is refused with a message naming the
+    right role: "This is a staff address. Choose Staff to verify it."
 - `confirm` sets the verified status and `profile_type` in one write.
   `DELETE /api/profile/verification/` clears both and sets `VISITOR`.
 - One account has one university address. Verifying the other role replaces the
@@ -48,7 +76,9 @@ see Visitor and verify when they next choose Student or Staff.
 
 ## Verification
 
-All 109 backend tests pass on this branch. Headless Chrome through the Vite proxy
+All 114 backend tests pass on this branch (`manage.py test accounts core --keepdb`),
+including valid Staff, Staff with a student ID, no dot, two dots, another domain,
+and a student ID still verifying Student. Headless Chrome through the Vite proxy
 (`.local/verify-roles.mjs`, ignored) checked:
 - Opening and closing the dialog, including with Escape, leaves Visitor unchanged.
 - A student address is refused for Staff with the right message.
@@ -66,8 +96,9 @@ All 109 backend tests pass on this branch. Headless Chrome through the Vite prox
    "Requires your SDU email."
 2. Click **Student**; confirm the dialog opens and Visitor stays selected. Press
    Escape; confirm nothing changed.
-3. Click **Staff** and enter a student address; confirm "This is a student address.
-   Choose Student to verify it."
+3. Click **Staff**; confirm the placeholder `name.surname@sdu.edu.kz`. Enter
+   `220103045@sdu.edu.kz`; confirm "Для сотрудника email должен быть в формате
+   имя.фамилия@sdu.edu.kz" and that no code is sent.
 4. Click **Student**, send a code (printed in the Django terminal in development),
    enter a wrong code, then the right one. Confirm **Student** with **Verified**.
 5. Choose **Visitor** and save, then **Student** again; confirm no dialog.
