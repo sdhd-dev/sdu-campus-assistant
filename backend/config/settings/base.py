@@ -83,10 +83,10 @@ def domain_list(name):
 
 
 # Optional. Without any domain, university email verification is hidden and its API refuses requests.
+# A domain may be in both lists (SDU uses sdu.edu.kz for everyone): the address format then
+# decides the role, a student ID for Student and name.surname for Staff.
 UNIVERSITY_STUDENT_DOMAINS = domain_list("UNIVERSITY_STUDENT_DOMAINS")
 UNIVERSITY_STAFF_DOMAINS = domain_list("UNIVERSITY_STAFF_DOMAINS")
-if UNIVERSITY_STUDENT_DOMAINS & UNIVERSITY_STAFF_DOMAINS:
-    raise ImproperlyConfigured("A university domain cannot be both a student and a staff domain.")
 
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "").strip() or "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "").strip()

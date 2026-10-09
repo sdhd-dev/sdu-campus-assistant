@@ -1,5 +1,6 @@
 """Confirms a Student or Staff status with a one-time code sent to a university email."""
 import logging
+import re
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -27,19 +28,36 @@ def enabled():
     return bool(settings.UNIVERSITY_STUDENT_DOMAINS or settings.UNIVERSITY_STAFF_DOMAINS)
 
 
+# SDU uses one domain for everyone, so the part before "@" tells the roles apart.
+LOCAL_PARTS = {
+    User.VerifiedAffiliation.STUDENT: re.compile(r"[0-9]+"),  # student ID
+    User.VerifiedAffiliation.STAFF: re.compile(r"[a-z]+\.[a-z]+"),  # name.surname
+}
+
+
+def role_domains(role):
+    if role == User.VerifiedAffiliation.STUDENT:
+        return settings.UNIVERSITY_STUDENT_DOMAINS
+    return settings.UNIVERSITY_STAFF_DOMAINS
+
+
 def affiliation_for_domain(domain):
-    """Maps an exact university domain to a status. Also the entry point for a future
-    Google Workspace path, where the domain would come from a verified "hd" claim."""
+    """Maps an exact university domain to a status, or None when the domain is shared by
+    both roles. Also the entry point for a future Google Workspace path, where the domain
+    would come from a verified "hd" claim."""
     domain = (domain or "").lower()
-    if domain in settings.UNIVERSITY_STUDENT_DOMAINS:
-        return User.VerifiedAffiliation.STUDENT
-    if domain in settings.UNIVERSITY_STAFF_DOMAINS:
-        return User.VerifiedAffiliation.STAFF
-    return None
+    roles = [role for role in LOCAL_PARTS if domain in role_domains(role)]
+    return roles[0] if len(roles) == 1 else None
 
 
 def affiliation_for_email(email):
-    return affiliation_for_domain(email.rpartition("@")[2])
+    """The role an address proves: its domain must be one of the role's domains and the
+    part before "@" must match the role's format. The formats never overlap."""
+    local, _, domain = email.lower().rpartition("@")
+    return next((
+        role for role, local_part in LOCAL_PARTS.items()
+        if domain in role_domains(role) and local_part.fullmatch(local)
+    ), None)
 
 
 def start(user, email):

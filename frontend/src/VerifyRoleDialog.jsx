@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { SESSION_EXPIRED, apiRequest, isVerification } from './auth.js';
 
 const LABELS = { STUDENT: 'Student', STAFF: 'Staff' };
+// Mirrors the staff format in backend/accounts/university.py; the server checks again.
+const STAFF_LOCAL_PART = /^[a-z]+\.[a-z]+$/;
+const STAFF_ADDRESS = 'Для сотрудника email должен быть в формате имя.фамилия@sdu.edu.kz';
 
 // "Verify your role": SDU email → code → the server sets the role. Closing it leaves
 // the current role as it was. The server checks the domain against the role again.
@@ -112,6 +115,10 @@ export default function VerifyRoleDialog({ role, onClose, onVerified, onSignedOu
   async function requestCode(event) {
     event?.preventDefault();
     const address = stage === 'code' ? state.pending_email : email.trim();
+    if (stage === 'email' && role === 'STAFF' && !isStaffAddress(address)) {
+      setError(STAFF_ADDRESS);
+      return;
+    }
     const data = await send('profile/verification/start', { email: address, role });
     if (!data) return;
     setCode('');
@@ -137,6 +144,11 @@ export default function VerifyRoleDialog({ role, onClose, onVerified, onSignedOu
   }
 
   const domains = state ? state[role === 'STUDENT' ? 'student_domains' : 'staff_domains'] : [];
+
+  function isStaffAddress(address) {
+    const [local, domain] = address.toLowerCase().split(/@(?=[^@]*$)/);
+    return STAFF_LOCAL_PART.test(local) && domains.includes(domain);
+  }
 
   return (
     // Escape and the close button both end here; the role is only ever set by the server.
@@ -173,12 +185,15 @@ export default function VerifyRoleDialog({ role, onClose, onVerified, onSignedOu
             <div className="input-wrap">
               <input id="role-email" ref={field} type="email" required maxLength={254}
                 autoComplete="email" autoCapitalize="none" spellCheck={false}
+                placeholder={role === 'STAFF' ? 'name.surname@sdu.edu.kz' : undefined}
                 aria-describedby="role-domains" readOnly={pending} value={email}
                 onChange={(event) => { setEmail(event.target.value); setError(''); }} />
             </div>
           </div>
           <p id="role-domains" className="security-text">
-            {domains.length > 0
+            {domains.length > 0 && role === 'STAFF'
+              ? `Staff addresses look like ${domains.map((domain) => `name.surname@${domain}`).join(' or ')}.`
+              : domains.length > 0
               ? `${label} addresses end in ${domains.map((domain) => `@${domain}`).join(' or ')}.`
               : `No ${label.toLowerCase()} domains are configured.`}
           </p>

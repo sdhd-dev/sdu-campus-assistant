@@ -15,8 +15,9 @@ from . import email_codes, google, university
 from .models import EmailCode, EmailCodeSend
 
 User = get_user_model()
-STUDENT_EMAIL = "a.student@stu.sdu.edu.kz"
-STAFF_EMAIL = "b.teacher@sdu.edu.kz"
+STUDENT_EMAIL = "220103045@sdu.edu.kz"
+STAFF_EMAIL = "aigerim.sadykova@sdu.edu.kz"
+STAFF_ADDRESS = "Для сотрудника email должен быть в формате имя.фамилия@sdu.edu.kz"
 
 
 class Capture(logging.Handler):
@@ -29,7 +30,7 @@ class Capture(logging.Handler):
 
 
 @override_settings(
-    UNIVERSITY_STUDENT_DOMAINS=frozenset({"stu.sdu.edu.kz"}),
+    UNIVERSITY_STUDENT_DOMAINS=frozenset({"sdu.edu.kz"}),
     UNIVERSITY_STAFF_DOMAINS=frozenset({"sdu.edu.kz"}),
 )
 class UniversityEmailTests(TestCase):
@@ -65,7 +66,7 @@ class UniversityEmailTests(TestCase):
         )
 
     def start(self, email=STUDENT_EMAIL, role=None, **kwargs):
-        role = role or ("STAFF" if email.strip().lower().endswith("@sdu.edu.kz") else "STUDENT")
+        role = role or ("STAFF" if "." in email.partition("@")[0] else "STUDENT")
         return self.post("verification-start", {"email": email, "role": role}, **kwargs)
 
     def confirm(self, code, **kwargs):
@@ -107,7 +108,7 @@ class UniversityEmailTests(TestCase):
             "resend_in", "student_domains", "staff_domains", "csrf_token",
         })
         self.assertIsNone(body["verified_affiliation"])
-        self.assertEqual(body["student_domains"], ["stu.sdu.edu.kz"])
+        self.assertEqual(body["student_domains"], ["sdu.edu.kz"])
         self.assertEqual(body["staff_domains"], ["sdu.edu.kz"])
 
     # Requesting a code
@@ -128,7 +129,7 @@ class UniversityEmailTests(TestCase):
         self.assertFalse(EmailCode.objects.exists())
 
     def test_code_is_sent_and_only_a_digest_is_stored(self):
-        response = self.start("  A.Student@STU.sdu.edu.kz ")
+        response = self.start("  220103045@SDU.edu.kz ")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["pending_email"], STUDENT_EMAIL)
         self.assertEqual(mail.outbox[0].to, [STUDENT_EMAIL])
@@ -189,13 +190,32 @@ class UniversityEmailTests(TestCase):
 
     # Confirming
 
-    def test_domain_must_match_the_chosen_role(self):
-        student = self.start(STUDENT_EMAIL, role="STAFF")
-        self.assertEqual(student.status_code, 400)
-        self.assertEqual(student.json()["detail"], "This is a student address. Choose Student to verify it.")
+    def test_staff_address_for_student_names_the_right_role(self):
         staff = self.start(STAFF_EMAIL, role="STUDENT")
+        self.assertEqual(staff.status_code, 400)
         self.assertEqual(staff.json()["detail"], "This is a staff address. Choose Staff to verify it.")
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_staff_address_must_be_name_dot_surname(self):
+        for email in (
+            STUDENT_EMAIL, "aigerimsadykova@sdu.edu.kz", "aigerim.k.sadykova@sdu.edu.kz",
+            "aigerim.sadykova@gmail.com", "aigerim.sadykova@x.sdu.edu.kz", "aigerim.sadykova1@sdu.edu.kz",
+        ):
+            with self.subTest(email=email):
+                response = self.start(email, role="STAFF")
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["detail"], STAFF_ADDRESS)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_staff_address_ignores_case(self):
+        response = self.start("  Aigerim.Sadykova@SDU.edu.kz ", role="STAFF")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["pending_email"], STAFF_EMAIL)
+
+    def test_student_id_address_still_verifies_student(self):
+        self.assertEqual(self.start(STUDENT_EMAIL, role="STUDENT").status_code, 200)
+        body = self.confirm(self.last_code()).json()
+        self.assertEqual((body["verified_affiliation"], body["profile_type"]), ("STUDENT", "STUDENT"))
 
     def test_student_code_verifies_and_sets_the_role_without_permissions(self):
         self.start()
@@ -212,7 +232,7 @@ class UniversityEmailTests(TestCase):
         self.assertFalse(self.user.is_staff or self.user.is_superuser)
         self.assertEqual(len(self.logged("verified")), 1)
 
-    def test_staff_domain_gives_staff(self):
+    def test_staff_name_surname_gives_staff(self):
         self.start(STAFF_EMAIL)
         body = self.confirm(self.last_code()).json()
         self.assertEqual((body["verified_affiliation"], body["profile_type"]), ("STAFF", "STAFF"))
@@ -312,6 +332,16 @@ class UniversityEmailTests(TestCase):
 
     # Groundwork for Google Workspace
 
+    def test_address_mapping_uses_the_local_part(self):
+        self.assertEqual(university.affiliation_for_email("220103045@SDU.EDU.KZ"), "STUDENT")
+        self.assertEqual(university.affiliation_for_email("Aigerim.Sadykova@sdu.edu.kz"), "STAFF")
+        for email in ("student@sdu.edu.kz", "a.b.c@sdu.edu.kz", "220103045@x.sdu.edu.kz", ""):
+            self.assertIsNone(university.affiliation_for_email(email))
+
+    def test_shared_domain_proves_no_role_on_its_own(self):
+        self.assertIsNone(university.affiliation_for_domain("sdu.edu.kz"))
+
+    @override_settings(UNIVERSITY_STUDENT_DOMAINS=frozenset({"stu.sdu.edu.kz"}))
     def test_domain_mapping_is_exact_and_case_insensitive(self):
         self.assertEqual(university.affiliation_for_domain("STU.SDU.EDU.KZ"), "STUDENT")
         self.assertEqual(university.affiliation_for_domain("sdu.edu.kz"), "STAFF")

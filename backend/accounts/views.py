@@ -394,6 +394,7 @@ def profile(request):
 UNIVERSITY_DISABLED = {"detail": "University email verification isn’t configured for this server."}
 UNIVERSITY_ONLY = {"detail": "Enter your SDU student or staff email address."}
 UNIVERSITY_ROLE = {"detail": "Choose Student or Staff to verify."}
+STAFF_ADDRESS = {"detail": "Для сотрудника email должен быть в формате имя.фамилия@sdu.edu.kz"}
 UNIVERSITY_SENT = "If this address can be verified, we sent a 6-digit code to it."
 UNIVERSITY_RESULTS = {
     university.INVALID: (400, "That code isn’t valid. Check the email and try again."),
@@ -417,7 +418,7 @@ def role_request_from(request):
     if (not isinstance(request.data, dict) or set(request.data) != {"email", "role"}
             or request.data["role"] not in User.VerifiedAffiliation.values):
         return None, UNIVERSITY_ROLE
-    email = request.data["email"]
+    email, role = request.data["email"], request.data["role"]
     if not isinstance(email, str) or len(email) > 254:
         return None, UNIVERSITY_ONLY
     email = User.objects.normalize_email(email.strip()).lower()
@@ -426,9 +427,11 @@ def role_request_from(request):
     except ValidationError:
         return None, UNIVERSITY_ONLY
     affiliation = university.affiliation_for_email(email)
+    if role == User.VerifiedAffiliation.STAFF and affiliation != role:
+        return None, STAFF_ADDRESS
     if affiliation is None:
         return None, UNIVERSITY_ONLY
-    if affiliation != request.data["role"]:
+    if affiliation != role:
         label = User.VerifiedAffiliation(affiliation).label
         return None, {"detail": f"This is a {label.lower()} address. Choose {label} to verify it."}
     return email, None
