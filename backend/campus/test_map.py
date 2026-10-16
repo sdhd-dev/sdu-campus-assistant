@@ -105,7 +105,8 @@ class MapLocationTests(TestCase):
     def test_no_n_plus_one_and_database_errors(self):
         room_id = Room.objects.get(code='E204').pk
         self.client.force_authenticate(self.user)
-        with self.assertNumQueries(1):
+        # One room/entrance lookup and one joined people/faculty lookup.
+        with self.assertNumQueries(2):
             self.select('room', id=room_id)
         with patch('django.db.models.query.QuerySet.get', side_effect=DatabaseError):
             self.assertEqual(self.select('block', code='E').status_code, 503)

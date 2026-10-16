@@ -149,3 +149,5 @@ labels come from the session-protected `/api/campus/blocks/` endpoint, with shor
 block labels retained on mobile. Block has two additional schema fields for this
 follow-up; use [campus-details.md](campus-details.md) for the required migration
 and conservative update command for existing databases.
+
+Barrel circles now allow pointer/keyboard selection and offer actual Room records by floor from `/api/campus/catalog/`. Facilities use explicit existing-element bindings, never inferred block locations. See [demo and facilities guide](campus-demo.md).

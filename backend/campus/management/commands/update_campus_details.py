@@ -8,3 +8,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         update_approved_details(self.stdout, self.stderr)
+        from campus.entrance_details import update_entrances
+        update_entrances(self.stdout, self.stderr)

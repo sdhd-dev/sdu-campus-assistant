@@ -32,6 +32,8 @@ main:has(.map-layout) > .viewpoint { display: none; }
 .map-disclaimer, .map-legend, .map-search-feedback { font-size: .83rem; color: var(--ink-soft); line-height: 1.6; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; }
 .map-search-results { display: flex; gap: 8px; flex-wrap: wrap; list-style: none; padding: 0; max-height: 150px; overflow: auto; }
+.map-search-results:has(.person-office) { max-height: 280px; }
+.map-search-results li:has(.person-office) { flex: 1 1 260px; border: 1px solid var(--line); border-radius: 9px; padding: 12px; overflow-wrap: anywhere; }
 .map-search-results a, .map-result-link { display: inline-block; padding: 10px 12px; color: var(--teal-600); border: 1px solid var(--line); border-radius: 9px; text-decoration: none; font-weight: 650; }
 .map-result-link { margin-top: 8px; }
 @media (max-width: 650px) {
