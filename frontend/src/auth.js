@@ -60,8 +60,8 @@ export function isVerification(data) {
       && data[key].every((domain) => typeof domain === 'string'));
 }
 
-export function searchRequest(query, page, options) {
-  return apiRequest('campus/search', { ...options, query: new URLSearchParams({ q: query, page }) });
+export function searchRequest(query, page, { faculty = '', type = '', ...options } = {}) {
+  return apiRequest('campus/search', { ...options, query: new URLSearchParams({ q: query, page, ...(faculty ? {faculty} : {}), ...(type ? {type} : {}) }) });
 }
 
 export function locationRequest(params, options) {

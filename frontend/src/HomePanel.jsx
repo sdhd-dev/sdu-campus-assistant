@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import './home.css';
 import { searchHash } from './SearchPanel.jsx';
 
-// Search is available; other sections remain placeholders.
+// Shared campus sections, used for navigation and protected-route recognition.
 export const SECTIONS = [
   {
     hash: 'search',
@@ -30,7 +30,7 @@ export const SECTIONS = [
   {
     hash: 'services',
     title: 'Services',
-    text: 'Opening hours, ID cards, library, and more.',
+    text: 'View service locations, published hours and contacts.',
     icon: (
       <>
         <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
@@ -107,7 +107,7 @@ export default function HomePanel({ session, onSignedOut }) {
       <div className="quick-examples" aria-label="Search examples">{['E204', 'Barrel A1', 'Block F'].map(q => <a key={q} href={`#${searchHash(q)}`}>{q}</a>)}</div>
       <nav aria-label="Campus sections">
         <ul className="home-grid">
-          {SECTIONS.filter(section => ['search', 'map'].includes(section.hash)).map((section) => (
+          {SECTIONS.filter(section => ['search', 'map', 'services'].includes(section.hash)).map((section) => (
             <li key={section.hash}>
               <a className="home-card" href={`#${section.hash}`}>
                 <Icon>{section.icon}</Icon>
@@ -120,7 +120,6 @@ export default function HomePanel({ session, onSignedOut }) {
       </nav>
 
       {catalog?.length > 0 && <section className="explore-campus" aria-labelledby="explore-title"><h2 id="explore-title">Explore campus</h2><ul>{catalog.map(item => <li key={`${item.type}-${item.id}`}><a href={`#${searchHash(item.type === 'room' ? item.name : `Block ${item.code}`)}`}>{item.type === 'room' ? item.name : `Block ${item.code}`}</a>{item.block?.faculty_name && <span>{item.block.faculty_name}</span>}</li>)}</ul></section>}
-      <section className="planned-features"><h2>Planned features <small>Coming later</small></h2><a href="#services">Services</a> · <a href="#directory">Directory</a></section>
     </section>
   );
 }

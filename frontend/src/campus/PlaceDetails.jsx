@@ -19,6 +19,9 @@ export function RoomDescription({ place }) {
 }
 
 export function EntranceDescription({ description }) {
-  if (!description || description === 'Entrance reported by the project team; exact coordinates have not been collected.') return null;
+  if (!description || [
+    'Entrance reported by the project team; exact coordinates have not been collected.',
+    'Entrance reported by the project team; its position on the schematic is provisional.',
+  ].includes(description)) return null;
   return <p>{description}</p>;
 }

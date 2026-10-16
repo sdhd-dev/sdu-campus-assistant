@@ -10,7 +10,7 @@ def place_data(place):
     block = place.block or (place.room.block if place.room_id else None)
     entry = place.recommended_entrance
     return {"id": place.pk, "type": "place", "code": place.slug, "name": place.name,
-            "category": place.category, "description": place.description,
+            "category": place.category, "description": place.description, "aliases": place.aliases,
             "location": place.location, "details": place.details, "photo": place.photo,
             "photo_alt": place.photo_alt, "map_note": place.map_note,
             "block": block_details(block) if block else None,
@@ -19,6 +19,11 @@ def place_data(place):
             "entrance": {"code": entry.code if entry else None, "name": entry.name if entry else None,
                          "description": entry.description if entry else "", "status": "UNKNOWN"},
             "opening_hours": place.opening_hours, "source": place.source,
+            "is_service": place.is_service, "working_days": place.working_days,
+            "lunch_break": place.lunch_break, "document_collection_hours": place.document_collection_hours,
+            "schedule_note": place.schedule_note, "weekly_hours": place.weekly_hours,
+            "schedule_sources": place.schedule_sources, "contacts": place.contacts,
+            "service_staff": place.service_staff, "extra_photos": place.extra_photos,
             "verification_status": place.verification_status,
             "verified_at": place.verified_at, "provisional": place.verification_status != "VERIFIED",
             "map_available": bool(place.map_element), "map_element": place.map_element}

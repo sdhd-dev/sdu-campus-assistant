@@ -1,8 +1,8 @@
 # SDU Campus Assistant
 
-Ready: email/session accounts and profiles, room/block/barrel/facility search, and a schematic 2D campus map. Home highlights search and the map, with shared authenticated navigation.
+Ready: email/session accounts and profiles, room/block/barrel/facility/staff search, university services, and a schematic 2D campus map. Home highlights search, the map and Services, with shared authenticated navigation. See [staff directory](docs/staff-directory.md) and [service data, photos and schedules](docs/university-services.md).
 
-Planned: Services, Directory and additional facilities data. Generated room existence, some entrances and map annotations still require a campus survey. No routes or floor plans are provided. See [demo, database upgrades, admin, JSON import and survey checklist](docs/campus-demo.md).
+Planned: additional facilities data. Generated room existence, listed office allocations, some entrances and map annotations still require a campus survey. No routes or floor plans are provided. See [demo, database upgrades, admin, JSON import and survey checklist](docs/campus-demo.md).
 
 ## Structure
 

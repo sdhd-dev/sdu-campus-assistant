@@ -1,4 +1,5 @@
 import FacilityCard from './campus/FacilityCard.jsx';
+import PersonCard, { RoomPeople } from './campus/PersonCard.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { apiRequest, locationRequest, searchRequest, SESSION_EXPIRED } from './auth.js';
 import CampusMap, { MAP_BLOCKS, MAP_ENTRANCES } from './map/CampusMap.jsx';
@@ -85,7 +86,7 @@ export default function MapPanel({ hash, onSignedOut }) {
       if (!response.ok || !Array.isArray(data.results)) throw new Error('Search unavailable');
       setResults({ status: 'ready', data });
       // Exact, unambiguous searches can select immediately. Partial searches show choices.
-      if (data.count === 1 && data.results[0].map_available !== false) choose(data.results[0].type, ['room', 'place'].includes(data.results[0].type) ? data.results[0].id : data.results[0].code, true);
+      if (data.count === 1 && data.results[0].type !== 'person' && data.results[0].map_available !== false) choose(data.results[0].type, ['room', 'place'].includes(data.results[0].type) ? data.results[0].id : data.results[0].code, true);
     }).catch(() => { if (!controller.signal.aborted) setResults({ status: 'error' }); });
     return () => controller.abort();
   }, [search, searchAttempt, onSignedOut]);
@@ -110,9 +111,9 @@ export default function MapPanel({ hash, onSignedOut }) {
     <form className="home-search" role="search" onSubmit={event => {
       event.preventDefault(); setSearch(query.trim()); setSearchAttempt(value => value + 1);
     }}>
-      <label className="sr-only" htmlFor="map-query">Room number, block or barrel</label>
+      <label className="sr-only" htmlFor="map-query">Room, block, place or staff name</label>
       <input id="map-query" value={query} onChange={event => setQuery(event.target.value)} maxLength={80}
-        type="search" placeholder="E204, Block H or Barrel D2" />
+        type="search" placeholder="E204, Barrel D2 or staff name" />
       <button className="submit-button" type="submit">Search</button>
     </form>
     <div className="map-search-feedback" aria-live="polite">
@@ -123,7 +124,7 @@ export default function MapPanel({ hash, onSignedOut }) {
       {results.status === 'ready' && <>
         {!results.data.count && <p>No match in the campus inventory. Try E204 or Barrel D2.</p>}
         <ul className="map-search-results">{results.data.results.map(item => <li key={`${item.type}-${item.id}`}>
-          {item.map_available === false ? <span>{item.name} · Map location not recorded</span> : <a href={`#${mapHash(item.type, ['room', 'place'].includes(item.type) ? item.id : item.code)}`}>
+          {item.type === 'person' ? <PersonCard person={item} /> : item.map_available === false ? <span>{item.name} · Map location not recorded</span> : <a href={`#${mapHash(item.type, ['room', 'place'].includes(item.type) ? item.id : item.code)}`}>
             {item.type === 'block' ? `Block ${item.code}` : item.type === 'place' ? item.name : item.code} · Show on map
           </a>}
         </li>)}</ul>
@@ -174,14 +175,12 @@ export default function MapPanel({ hash, onSignedOut }) {
           {!mapped.context_only && <FacultyInfo block={place.block} />}
           {place.type === 'room' && <p>{kindName[place.kind] || kindName.UNKNOWN}</p>}
           <RoomDescription place={place} />
+          {place.type === 'room' && <RoomPeople people={place.people} />}
           <EntranceDescription description={place.entrance?.description} />
           {place.type === 'place' && <><p>Recommended entrance: {entryName(place.entrance?.code)}</p><p>{place.block ? `Block ${place.block.code}` : 'Block not recorded'} · {place.floor === null ? 'Floor not recorded' : place.floor === 0 ? 'Basement' : `Floor ${place.floor}`}</p><p>{place.opening_hours || 'Opening hours not recorded'}</p>{!place.map_available && <p>Map location not recorded.</p>}{place.provisional && <p>Facility details require verification.</p>}</>}
-          {place.type === 'room' && place.provisional && <p className="map-notice">Provisional room record — existence requires verification.</p>}
-          {place.type === 'room' && <p>Shown by building only. Room positions and floor plans are not available.</p>}
           {mapped.context_only && <p>Context building. Facility details and entrance recommendation are not confirmed.</p>}
           {mapped.block_code === 'B' && <p>Library area — boundaries require confirmation.</p>}
           {!mapped.entrance_code && <p>Entrance information is not available for this location.</p>}
-          {place.entrance?.status === 'PROVISIONAL' && <p className="map-notice">Provisional entrance recommendation — requires verification.</p>}
           {place.entrance?.status === 'UNKNOWN' && mapped.entrance_code && <p>Entrance recommendation confidence is not confirmed.</p>}
           {mapped.entrance_position_provisional && <p className="map-notice">Entrance I position is provisional.</p>}
           {missingBlock && <p role="alert">This building has no shape on the current map.</p>}

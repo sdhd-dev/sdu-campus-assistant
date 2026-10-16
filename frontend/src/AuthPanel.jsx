@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import HomePanel, { SECTIONS, SectionPlaceholder } from './HomePanel.jsx';
 import SearchPanel from './SearchPanel.jsx';
+import ServicesPanel from './ServicesPanel.jsx';
 import MapPanel from './MapPanel.jsx';
 import LoginForm from './LoginForm.jsx';
 import ProfilePanel from './ProfilePanel.jsx';
@@ -76,15 +77,17 @@ export default function AuthPanel({ onView }) {
       content = <ProfilePanel session={state.session} onSignedOut={signedOut} />;
     } else if (route === 'home') {
       content = <HomePanel session={state.session} onSignedOut={signedOut} />;
-    } else if (route === 'search') {
+    } else if (route === 'search' || route === 'directory') {
       content = <SearchPanel hash={hash} onSignedOut={signedOut} />;
     } else if (route === 'map') {
       content = <MapPanel hash={hash} onSignedOut={signedOut} />;
+    } else if (route === 'services') {
+      content = <ServicesPanel hash={hash} onSignedOut={signedOut} />;
     } else {
       const section = SECTIONS.find((item) => item.hash === route);
       content = <SectionPlaceholder title={section.title} />;
     }
-    content = <><nav className="campus-navigation" aria-label="Main navigation">{[['home', 'Home'], ['search', 'Search'], ['map', 'Campus Map'], ['profile', 'Profile']].map(([key, label]) => <a key={key} href={`#${key}`} aria-current={route === key ? 'page' : undefined}>{label}</a>)}</nav>{content}</>;
+    content = <><nav className="campus-navigation" aria-label="Main navigation">{[['home', 'Home'], ['directory', 'Staff Directory'], ['map', 'Campus Map'], ['services', 'Services'], ['profile', 'Profile']].map(([key, label]) => <a key={key} href={`#${key}`} aria-current={route === key ? 'page' : undefined}>{label}</a>)}</nav>{content}</>;
   } else if (state.status === 'anonymous') {
     view = page;
     content = page === 'login'

@@ -7,8 +7,9 @@ FACULTY_SOURCE = 'Team-provided campus diagram; not independently verified'
 FACULTIES = {
     'D': 'Faculty of Law & Social Sciences',
     'E': 'Faculty of Education & Humanities',
-    'F': 'Faculty of Engineering and Natural Sciences',
+    'F': 'SITAM (School of IT and Applied Mathematics)',
     'G': 'SDU Business School',
+    'I': 'SITAM (School of IT and Applied Mathematics)',
 }
 # Legacy values are an explicit allowlist, not a heuristic for overwriting edits.
 BARREL_DETAILS = [

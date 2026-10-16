@@ -11,6 +11,7 @@ from rest_framework.response import Response
 
 from accounts.views import CSRFAuthentication, UNAUTHENTICATED
 from .models import Block, Room
+from .directory import matching_people, person_data, room_people, room_office_prefetch
 from .numbering import normalize_room_code
 
 MAX_QUERY_LENGTH = 80
@@ -54,7 +55,8 @@ def room_data(room):
         "entrance": entrance_data(room.effective_entrance, room.block,
                                   override=room.recommended_entrance_id is not None),
         "source": room.source,
-        "provisional": not room.source or room.source.startswith("Сгенерировано"),
+        "provisional": not room.source or room.source.startswith(("Сгенерировано", "Office transcription:")),
+        "people": room_people(room),
     }
 
 
@@ -86,11 +88,17 @@ def search(request):
     except ValueError:
         return Response({"detail": "page: 1–100; page_size: 1–50."}, status=400)
     query = normalized(raw)
+    faculty = request.query_params.get("faculty", "").strip().upper()
+    result_type = request.query_params.get("type", "")
+    if result_type not in {"", "person"}:
+        return Response({"detail": "Choose person or omit the result type."}, status=400)
+    if faculty and faculty not in {"SSBL", "SITAM"}:
+        return Response({"detail": "Choose SSBL or SITAM."}, status=400)
     empty = {"query": query, "count": 0, "page": page, "page_size": size,
              "next_page": None, "results": []}
     if not query:
-        return Response(empty)
-    code = normalize_room_code(re.sub(r"\s+", "", query))
+        return Response({**empty, "faculties": [{"code": "SSBL", "name": "SSBL"}, {"code": "SITAM", "name": "SITAM"}]})
+    code = normalize_room_code(re.sub(r"[\s-]+", "", query))
     block_code = re.sub(r"^(БЛОК|BLOCK)\s+", "", query)
     # JSON aliases are compared individually, not as serialized JSON text.
     # The escaped LIKE argument keeps %, _ and backslashes literal.
@@ -122,18 +130,23 @@ def search(request):
             normalized_name=RawSQL(NORMALIZED_SQL.format("campus_campusplace.name"), [CYRILLIC_LOWER, CYRILLIC_UPPER]),
             alias_exact=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(campus_campusplace.aliases) a WHERE " + alias_sql + " = %s)", [CYRILLIC_LOWER, CYRILLIC_UPPER, query]),
             alias_partial=RawSQL("EXISTS (SELECT 1 FROM jsonb_array_elements_text(campus_campusplace.aliases) a WHERE " + alias_sql + " LIKE %s)", [CYRILLIC_LOWER, CYRILLIC_UPPER, pattern]),
-        ).filter(Q(normalized_name__contains=query) | Q(alias_partial=True) | Q(slug__iexact=raw.strip())).annotate(
+        ).filter(Q(normalized_name__contains=query) | Q(alias_partial=True) | Q(slug__iexact=raw.strip()) | Q(room__code__iexact=code)).annotate(
             rank=Case(When(Q(normalized_name=query) | Q(alias_exact=True) | Q(slug__iexact=raw.strip()), then=Value(0)), default=Value(1), output_field=IntegerField())
         ).order_by("rank", "slug")
-        count = rooms.count() + blocks.count() + places.count()
+        if faculty or result_type == "person":
+            rooms, blocks, places = rooms.none(), blocks.none(), places.none()
+        rooms = rooms.prefetch_related(room_office_prefetch())
+        people = matching_people(raw, faculty)
+        count = rooms.count() + blocks.count() + places.count() + people.count()
         end = page * size
         # Each independently ordered source only needs its first `end` rows.
         # Sorting that bounded merge yields stable pagination across both types.
         matches = [(r.rank, r.code, "room", room_data(r)) for r in rooms[:end]]
         matches += [(b.rank, b.code, "block", block_data(b)) for b in blocks[:end]]
         matches += [(p.rank, p.slug, "place", place_data(p)) for p in places[:end]]
+        matches += [(p.rank, p.search_name, "person", person_data(p)) for p in people[:end]]
         matches.sort(key=lambda item: item[:3])
-        return Response({**empty, "count": count,
+        return Response({**empty, "count": count, "faculties": [{"code": "SSBL", "name": "SSBL"}, {"code": "SITAM", "name": "SITAM"}],
                          "next_page": page + 1 if count > end and page < MAX_PAGE else None,
                          "results": [item[3] for item in matches[(page - 1) * size:end]]})
     except DatabaseError:

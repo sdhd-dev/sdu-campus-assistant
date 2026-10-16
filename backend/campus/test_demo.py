@@ -133,6 +133,7 @@ class DemoTests(TestCase):
         for n in range(4):
             CampusPlace.objects.create(slug=f'place-{n}', name=f'Survey place {n}',category='OTHER',room=Room.objects.get(code='E204'))
         self.client.force_authenticate(self.user)
-        with self.assertNumQueries(6):
+        # Person count/results are an additional bounded search source.
+        with self.assertNumQueries(8):
             response=self.client.get('/api/campus/search/', {'q':'Survey place'})
         self.assertEqual(response.json()['count'],4)

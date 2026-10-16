@@ -33,7 +33,7 @@ class ApprovedDetailsTests(TestCase):
             block = Block.objects.get(code=code)
             self.assertEqual(block.faculty_name, name)
             self.assertEqual(block.faculty_source, FACULTY_SOURCE)
-        for code in 'HI':
+        for code in 'H':
             self.assertEqual(Block.objects.get(code=code).faculty_name, '')
         self.assertEqual(Room.objects.count(), 128)
 
@@ -45,7 +45,7 @@ class ApprovedDetailsTests(TestCase):
         structural = lambda: list(Room.objects.order_by('id').values('id','code','block_id','floor','aliases','recommended_entrance_id','source'))
         before = structural()
         out, err = self.update()
-        self.assertIn('8 rooms, 4 blocks; 0 conflicts', out)
+        self.assertIn('8 rooms, 5 blocks; 0 conflicts', out)
         self.assertEqual(err, '')
         self.assertEqual(structural(), before)
         self.test_fresh_seed_has_approved_english_and_only_known_faculties()
@@ -111,8 +111,8 @@ class ApprovedDetailsTests(TestCase):
         for code, faculty in FACULTIES.items():
             response = self.client.get('/api/campus/search/', {'q':faculty.lower()})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.data['count'], 1)
-            block = response.data['results'][0]
+            self.assertEqual(response.data['count'], 2 if code in 'FI' else 1)
+            block = next(item for item in response.data['results'] if item['code'] == code)
             self.assertEqual(block['type'], 'block')
             self.assertEqual(block['code'], code)
             self.assertEqual(block['block']['faculty_name'], faculty)

@@ -1,4 +1,12 @@
 .facility-card { min-width:0; }
+.facility-gallery { display:flex; flex-wrap:wrap; gap:10px; }
+.service-gallery .facility-photo-button { max-width:260px; }
+.service-gallery .facility-photo-button img { object-fit:contain; height:180px; background:#edf1f2; }
+.service-summary-photo { display:block; width:100%; max-width:250px; height:150px; object-fit:contain; }
+.service-details dl { margin:12px 0; }
+.service-details dt { font-weight:650; margin-top:10px; }
+.service-details dd { margin:3px 0 10px; overflow-wrap:anywhere; }
+.service-schedule-note { border-left:3px solid var(--teal-600); padding:10px; background:var(--surface-solid); }
 .facility-card h2 { margin-top:0; }
 .facility-location { font-weight:650; }
 .facility-category, .facility-map-note { color:var(--ink-soft); font-size:.85rem; }
