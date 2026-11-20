@@ -1,0 +1,74 @@
+/* ---------------------------------------------------------------------------
+   The campus photograph: one real picture of SDU University, framed three ways.
+   Only the crop moves between views — the image itself is never reloaded.
+--------------------------------------------------------------------------- */
+
+.campus-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Tones sampled from the photograph, so a slow or failed load still reads
+     as the same place rather than as a broken page. */
+  background: linear-gradient(180deg, #b6c3cb 0%, #98a8ac 38%, #7c8672 72%, #6c7360 100%);
+}
+
+.campus-parallax {
+  position: absolute;
+  inset: 0;
+  transition: transform 500ms cubic-bezier(0.2, 0.6, 0.2, 1);
+  will-change: transform;
+}
+
+/* The frame is deliberately larger than the viewport, which gives the crop
+   room to travel without ever exposing an edge. */
+.campus-frame {
+  position: absolute;
+  inset: -12%;
+  transition: transform var(--camera-move) var(--camera-ease);
+  will-change: transform;
+}
+
+.campus-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 52%;
+  opacity: 0;
+  transition: opacity 1100ms ease;
+}
+
+.campus-stage[data-state='ready'] .campus-photo { opacity: 1; }
+.campus-stage[data-state='failed'] .campus-photo { display: none; }
+
+/* Restrained grading only: a light vignette and a touch of contrast at the
+   edges, so the campus stays legible instead of sitting under a dark wash. */
+.campus-grade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(16 34 46 / 26%) 0%, rgb(16 34 46 / 0%) 18%),
+    linear-gradient(0deg, rgb(16 34 46 / 30%) 0%, rgb(16 34 46 / 0%) 20%),
+    radial-gradient(118% 92% at 50% 44%, rgb(14 30 42 / 0%) 46%, rgb(14 30 42 / 26%) 100%);
+}
+
+/* --- Mobile and reduced motion -------------------------------------------- */
+
+/* Phones get the same photograph with a calmer frame and no parallax layer;
+   the crop still moves, just over a shorter distance. */
+@media (max-width: 860px) {
+  .campus-frame { inset: -8%; }
+  .campus-photo { object-position: 46% 56%; }
+  .campus-grade {
+    background:
+      linear-gradient(180deg, rgb(16 34 46 / 30%) 0%, rgb(16 34 46 / 0%) 22%),
+      linear-gradient(0deg, rgb(16 34 46 / 36%) 0%, rgb(16 34 46 / 0%) 28%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campus-frame,
+  .campus-parallax { transition: none; }
+  .campus-photo { opacity: 1; transition: none; }
+}

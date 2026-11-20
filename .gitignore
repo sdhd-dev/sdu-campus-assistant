@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.venv/
+.local/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+backend/staticfiles/
+*.log
+.DS_Store
+.idea/
+.vscode/
